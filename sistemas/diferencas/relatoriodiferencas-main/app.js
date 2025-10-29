@@ -1,9 +1,6 @@
 // app.js
-import {
-  auth, db, onAuthStateChanged,
-  collection, getDocs, query, where,
-  orderBy, addDoc, doc, getDoc,
-  updateDoc, deleteDoc, serverTimestamp
+import { 
+  auth, db, onAuthStateChanged, collection, getDocs, query, where, orderBy, addDoc, doc, getDoc, updateDoc, deleteDoc, serverTimestamp
 } from "./firebaseConfig.js";
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -61,11 +58,13 @@ function configurarInterface(admin) {
 }
 
 // ===========================
-// Popula selects de matrícula
+// Popula selects de matrícula (corrigido)
 // ===========================
 async function popularSelects(admin) {
   const selectForm = document.getElementById("matriculaForm");
   const selectResumo = document.getElementById("selectMatriculas");
+  const filtroMatricula = document.getElementById("filtroMatricula"); // correção
+
   const snapshot = await getDocs(collection(db, "users"));
   const matriculas = [];
 
@@ -76,7 +75,7 @@ async function popularSelects(admin) {
 
   matriculas.sort((a, b) => a.matricula.localeCompare(b.matricula, 'pt-BR', { numeric: true }));
 
-  [selectForm, selectResumo].forEach(sel => {
+  [selectForm, selectResumo, filtroMatricula].forEach(sel => {
     if (!sel) return;
     sel.innerHTML = '<option value="">Selecione uma matrícula</option>';
     matriculas.forEach(u => {
@@ -105,25 +104,10 @@ function inicializarEventos(admin, matricula) {
   if (btnToggleResumo) btnToggleResumo.addEventListener("click", () => document.getElementById("resumoWrap").classList.toggle("collapsed"));
   if (btnLogout) btnLogout.addEventListener("click", () => auth.signOut().then(() => window.location.href = "/login.html"));
 
-  // Filtro "Ver apenas"
+  // Filtro "Ver apenas" restaurado
   if (filtroResumo) {
     filtroResumo.addEventListener("change", () => carregarResumoMensal(admin));
   }
-}
-
-// ===========================
-// Toast visual
-// ===========================
-function mostrarToast(mensagem, tipo = "sucesso") {
-  const toast = document.createElement("div");
-  toast.textContent = mensagem;
-  toast.className = `toast ${tipo}`;
-  document.body.appendChild(toast);
-  setTimeout(() => toast.classList.add("show"), 100);
-  setTimeout(() => {
-    toast.classList.remove("show");
-    setTimeout(() => toast.remove(), 300);
-  }, 2500);
 }
 
 // ===========================
@@ -156,11 +140,11 @@ async function salvarRelatorio(admin) {
       valorDinheiro,
       valorFolha
     });
-    mostrarToast("Relatório salvo com sucesso!");
+    alert("Relatório salvo!");
     carregarRelatorios(true, matricula);
   } catch (e) {
     console.error("Erro ao salvar relatório:", e);
-    mostrarToast("Erro ao salvar relatório!", "erro");
+    alert("Erro ao salvar relatório.");
   }
 }
 
@@ -172,49 +156,25 @@ async function carregarRelatorios(admin, userMatricula) {
   lista.innerHTML = "";
 
   try {
-    const dataInicio = document.getElementById("filtroDataInicio")?.value;
-    const dataFim = document.getElementById("filtroDataFim")?.value;
-    const matriculaFiltro = admin ? document.getElementById("filtroMatricula")?.value : userMatricula;
-
-    let q = collection(db, "relatorios");
-    let filtros = [];
-
-    if (matriculaFiltro) filtros.push(where("matricula", "==", matriculaFiltro));
-    if (dataInicio) filtros.push(where("dataCaixa", ">=", new Date(dataInicio)));
-    if (dataFim) {
-      const fim = new Date(dataFim);
-      fim.setHours(23, 59, 59, 999);
-      filtros.push(where("dataCaixa", "<=", fim));
+    let q;
+    if (admin) {
+      q = query(collection(db, "relatorios"), orderBy("criadoEm", "desc"));
+    } else {
+      q = query(collection(db, "relatorios"), where("matricula", "==", userMatricula), orderBy("criadoEm", "desc"));
     }
-
-    if (filtros.length > 0) q = query(q, ...filtros, orderBy("dataCaixa", "desc"));
-    else q = query(q, orderBy("dataCaixa", "desc"));
 
     const snapshot = await getDocs(q);
 
-    if (snapshot.empty) {
-      lista.innerHTML = "<p>Nenhum relatório encontrado.</p>";
-      return;
-    }
-
-    snapshot.forEach((docSnap) => {
+    snapshot.forEach(docSnap => {
       const r = docSnap.data();
       const tr = document.createElement("div");
       tr.className = "relatorio-item";
 
       const diferencaClass = r.sobraFalta >= 0 ? "positivo" : "negativo";
-      const dataFormatada =
-        r.dataCaixa instanceof Object && r.dataCaixa.toDate
-          ? r.dataCaixa.toDate().toLocaleDateString()
-          : new Date(r.dataCaixa).toLocaleDateString();
-
-      const badge = r.posEditado
-        ? `<span class="badge-metalica">Verificar Pós Conferência</span>`
-        : "";
 
       tr.innerHTML = `
         <div class="item-header">
-          <strong>${dataFormatada}</strong> — Matrícula: ${r.matricula} ${badge}
+          <strong>${r.dataCaixa instanceof Object && r.dataCaixa.toDate ? r.dataCaixa.toDate().toLocaleDateString() : new Date(r.dataCaixa).toLocaleDateString()}</strong> — Matrícula: ${r.matricula}
           <button class="btn outline btnToggle" data-id="${docSnap.id}">Ocultar/Exibir</button>
         </div>
         <div class="item-body hidden">
@@ -226,10 +186,7 @@ async function carregarRelatorios(admin, userMatricula) {
           </table>
           <div class="actions">
             <button class="btn outline btnPos" data-id="${docSnap.id}">Pós Conferência</button>
-            ${admin ? `
-              <button class="btn primary btnEdit" data-id="${docSnap.id}">Editar</button>
-              <button class="btn danger btnExcluir" data-id="${docSnap.id}">Excluir</button>
-            ` : ""}
+            ${admin ? `<button class="btn primary btnEdit" data-id="${docSnap.id}">Editar</button>` : ""}
           </div>
         </div>
       `;
@@ -252,24 +209,8 @@ async function carregarRelatorios(admin, userMatricula) {
       btn.addEventListener("click", () => editarRelatorio(btn.dataset.id));
     });
 
-    document.querySelectorAll(".btnExcluir").forEach(btn => {
-      btn.addEventListener("click", async () => {
-        const id = btn.dataset.id;
-        if (!confirm("Tem certeza que deseja excluir este relatório?")) return;
-        try {
-          await deleteDoc(doc(db, "relatorios", id));
-          mostrarToast("Relatório excluído com sucesso!");
-          carregarRelatorios(admin, userMatricula);
-        } catch (e) {
-          console.error("Erro ao excluir relatório:", e);
-          mostrarToast("Erro ao excluir relatório!", "erro");
-        }
-      });
-    });
-
   } catch (e) {
     console.error("Erro ao carregar relatórios:", e);
-    mostrarToast("Falha ao carregar relatórios.", "erro");
   }
 }
 
@@ -290,15 +231,18 @@ async function abrirPosConferencia(id, admin) {
 
   document.getElementById("btnSalvarPos").onclick = async () => {
     if (!admin) return;
-    await updateDoc(docRef, { posTexto: textarea.value, posEditado: true });
-    mostrarToast("Pós Conferência salva!");
+    await updateDoc(docRef, {
+      posTexto: textarea.value,
+      posEditado: true
+    });
+    alert("Pós Conferência salva!");
     modal.close();
     carregarRelatorios(true, "");
   };
 }
 
 // ===========================
-// Editar relatório
+// Editar relatório (Admin)
 // ===========================
 async function editarRelatorio(id) {
   const docRef = doc(db, "relatorios", id);
@@ -318,7 +262,7 @@ async function editarRelatorio(id) {
     observacao: novaObs
   });
 
-  mostrarToast("Relatório atualizado!");
+  alert("Relatório atualizado!");
   carregarRelatorios(true, "");
 }
 
@@ -374,6 +318,7 @@ async function carregarResumoMensal(admin) {
       <details><summary>Dias com sobra</summary>${detalhesPos.join("<br>") || "-"}</details>
       <details><summary>Dias com falta</summary>${detalhesNeg.join("<br>") || "-"}</details>
     `;
+
   } catch (e) {
     console.error("Erro ao carregar resumo:", e);
   }
