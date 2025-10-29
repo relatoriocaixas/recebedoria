@@ -1,0 +1,269 @@
+﻿/* ===== Reset básico ===== */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* ===== Corpo ===== */
+body {
+    background-color: #121212;
+    color: #E0E0E0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 20px;
+
+    /* 🔹 Escala geral reduzida (equivalente a ~75%) */
+    transform: scale(0.75);
+    transform-origin: top left;
+}
+
+/* ===== Cabeçalho ===== */
+header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    width: 100%;
+    max-width: 1200px;
+    padding: 20px;
+    background-color: #2A2A2A;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+    margin-bottom: 25px;
+
+    /* 🔹 Adiciona deslocamento para a direita */
+    margin-left: 350px;
+}
+
+header img.logo {
+    height: 70px; /* logo maior */
+}
+
+header h1 {
+    flex-grow: 1;
+    font-size: 2rem;
+    color: #00ff7f;
+    text-align: center; /* título centralizado */
+    background-color: #222;
+    padding: 10px 20px;
+    border-radius: 10px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+header button {
+    padding: 8px 14px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    background-color: #00ff7f;
+    color: #1E1E1E;
+    font-weight: bold;
+    transition: 0.3s;
+}
+
+header button:hover {
+    filter: brightness(1.1);
+}
+
+/* ===== Formulário ===== */
+form {
+    background-color: #2A2A2A;
+    padding: 25px 30px;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.6);
+    width: 100%;
+    max-width: 650px;
+
+    /* 🔹 desloca o formulário para a direita */
+    margin-left: 350px; /*ajuste valor conforme quiser*/
+}
+
+
+.form-group {
+    margin-bottom: 15px;
+    display: flex;
+    flex-direction: column;
+}
+
+.form-group label {
+    margin-bottom: 6px;
+    font-weight: bold;
+    color: #00ff7f;
+}
+
+.form-group input,
+.form-group select {
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid #00B070;
+    background-color: #1E1E1E;
+    color: #E0E0E0;
+    font-size: 1rem;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: #00D080;
+    box-shadow: 0 0 5px rgba(0,176,112,0.7);
+}
+
+/* ===== Botão salvar ===== */
+button#salvarBtn {
+    padding: 12px;
+    width: 100%;
+    border: none;
+    border-radius: 10px;
+    background-color: #00ff7f;
+    color: #1E1E1E;
+    font-weight: bold;
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+button#salvarBtn::before {
+    content: "💾 ";
+}
+
+button#salvarBtn:hover {
+    filter: brightness(1.2) scale(1.02);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.6);
+}
+
+/* Campos dinâmicos */
+#digiconField,
+#prodataField,
+#meiaViagemField {
+    display: none;
+}
+
+/* ===== Layout principal ===== */
+main {
+    display: flex;
+    gap: 20px;
+    width: 100%;
+    max-width: 1200px;
+    align-items: flex-start;
+}
+
+/* Estoque */
+#estoque {
+    margin-right: auto; /* colado na margem esquerda */
+    flex-shrink: 0;
+    width: 260px;
+    background: #1e1e1e;       /* fundo igual do relatório */
+    padding: 15px;             /* espaço interno igual */
+    border-radius: 10px;       /* borda arredondada igual */
+    color: #e0e0e0;
+    height: fit-content;       /* altura ajusta ao conteúdo */
+}
+
+#estoqueConteudo {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.cardEstoque {
+    background: linear-gradient(145deg, #2a2a2a, #232323);
+    border-radius: 10px;
+    padding: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.6);
+    transition: transform 0.2s, box-shadow 0.2s, filter 0.2s;
+}
+
+.cardEstoque:hover {
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.8);
+    filter: brightness(1.05);
+}
+
+.cardEstoque h3 {
+    margin: 0 0 8px 0;
+    font-size: 1rem;
+    font-weight: bold;
+    text-shadow: 1px 1px 2px rgba(255,255,255,0.2);
+}
+
+
+/* Bordos com cores novas */
+.cardEstoque:nth-child(1) h3 { color: #FFD700; }
+.cardEstoque:nth-child(2) h3 { color: #00FF7F; }
+.cardEstoque:nth-child(3) h3 { color: #87CEFA; }
+
+.cardEstoque p b { color: #FFFFFF; text-shadow: 0 0 2px rgba(255,255,255,0.5); }
+.cardEstoque p b.disponivel { color: #00CED1; }
+.cardEstoque p b.emprestado { color: #FF6347; }
+
+/* ===== Relatório ===== */
+.exportBtn {
+    margin-bottom: 12px;
+    padding: 10px 20px;
+    background: #0984e3;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: 0.3s;
+}
+
+table {
+    flex: 1;
+    margin-left: 0; /* relatório puxado para a esquerda */
+    border-collapse: collapse;
+    background: #1f1f1f;
+    border-radius: 8px;
+    overflow: hidden;
+    margin-top: 20px;
+    table-layout: auto; /* deixa colunas se expandirem conforme conteúdo */
+    width: 100%; /* ocupa toda a largura disponível do container */
+}
+
+th, td {
+    padding: 2px 15px; /* diminui altura das linhas */
+    text-align: left;
+    border-bottom: 1px solid #333;
+    font-size: 0.95rem;
+    color: #e0e0e0;
+    min-width: 140px; /* largura mínima de cada célula para ficarem mais compridas */
+}
+
+th {
+    background-color: #00ff7f;
+    color: #111;
+}
+
+tr:hover { background-color: #333; }
+
+td.matricula { font-weight: bold; text-align: center; }
+
+/* ===== Responsivo ===== */
+@media (max-width: 900px) {
+    header img.logo { height: 60px; }
+    header h1 { font-size: 1.8rem; padding: 8px 15px; }
+    main { flex-direction: column; align-items: flex-start; }
+    #estoque { width: 100%; margin-top: 20px; margin-left: 0; }
+}
+
+#estoque h2 {
+    color: #00ff7f; /* define a cor verde metálico */
+}
+
+.statusBtn {
+    font-weight: bold; /* texto em negrito */
+}
+
+.footer {
+    width: 100%;
+    text-align: center;
+    padding: 10px 0;
+    color: #888;          /* cor discreta */
+    font-size: 0.9rem;
+    margin-top: 20px;
+}

@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portal Unificado v2</title>
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="firebaseConfig.js"></script>
+  <script type="module" src="script.js"></script>
+  <script type="module" src="avisos.js"></script>
+</head>
+<body>
+  <div class="app">
+    <div id="sidebar" class="sidebar">
+      <div class="toggle">☰</div>
+      <div class="sidebar-badge" id="sidebarBadge">MATRICULA</div>
+      <ul>
+        <li data-target="home">🏠 <span class="label">Home</span></li>
+        <li data-target="abastecimento">💵 <span class="label">Abastecimento</span></li>
+        <li data-target="emprestimo">💳 <span class="label">Empréstimo</span></li>
+        <li data-target="relatorios">📊 <span class="label">Relatórios</span></li>
+        <li data-target="diferencas">⚖️ <span class="label">Diferenças</span></li>
+      </ul>
+      <div class="sidebar-footer">
+        <button id="changePassBtn">Alterar Senha</button>
+        <button id="logoutBtn">Sair</button>
+      </div>
+    </div>
+
+    <div class="main-content">
+      <div class="topbar"></div>
+
+      <div id="avisosSection" class="avisos">
+        <div style="text-align:center;margin-bottom:8px;">
+          <img src="assets/logo.png" alt="Movebuss" style="max-height:88px;filter:drop-shadow(0 0 6px rgba(192,192,192,0.25));">
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <h2>Avisos Recebedoria (<span id="dataVigente"></span>)</h2>
+          <div id="avisosControls"></div>
+        </div>
+
+        <table id="avisosTable">
+          <thead>
+            <tr>
+              <th>✓</th>
+              <th>Data</th>
+              <th>Mensagem</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="avisosList">
+            <!-- Avisos via JS -->
+          </tbody>
+        </table>
+      </div>
+
+      <div class="iframe-container" id="iframeContainer">
+        <iframe id="mainFrame" src=""></iframe>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,156 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Upload de Motoristas - Firestore</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #121212;
+      color: #f5f5f5;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 30px;
+    }
+    h1 {
+      color: #4CAF50;
+    }
+    input[type="file"] {
+      margin: 20px 0;
+    }
+    table {
+      border-collapse: collapse;
+      width: 90%;
+      max-width: 700px;
+      margin-top: 20px;
+      background: #1f1f1f;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    th, td {
+      padding: 10px;
+      border-bottom: 1px solid #333;
+      text-align: left;
+    }
+    th {
+      background-color: #333;
+    }
+    tr:hover {
+      background-color: #222;
+    }
+    button {
+      margin-top: 20px;
+      padding: 10px 20px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    button:hover {
+      background: #45a049;
+    }
+  </style>
+</head>
+<body>
+  <h1>Importar Motoristas para Firestore</h1>
+
+  <input type="file" id="csvFile" accept=".csv">
+  <table id="previewTable" style="display:none;">
+    <thead>
+      <tr><th>Matrícula</th><th>Nome</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <button id="uploadBtn" style="display:none;">Enviar para Firestore</button>
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyC-IlMNSPg4MmDDFqUSGAAO_dL_absBDLo",
+      authDomain: "cartoes-88211.firebaseapp.com",
+      projectId: "cartoes-88211",
+      storageBucket: "cartoes-88211.firebasestorage.app",
+      messagingSenderId: "314683342095",
+      appId: "1:314683342095:web:7625eef34a666bc7c2127a",
+      measurementId: "G-XB902LGX5S"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    const csvFileInput = document.getElementById("csvFile");
+    const previewTable = document.getElementById("previewTable");
+    const tbody = previewTable.querySelector("tbody");
+    const uploadBtn = document.getElementById("uploadBtn");
+    let motoristas = [];
+
+    csvFileInput.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const text = event.target.result;
+        const rows = text.split("\n").map(r => r.trim()).filter(r => r);
+        const headers = rows[0].split(",").map(h => h.trim().toLowerCase());
+
+        if (!headers.includes("matricula") || !headers.includes("nome")) {
+          alert("O CSV deve conter as colunas: matricula, nome");
+          return;
+        }
+
+        motoristas = rows.slice(1).map(row => {
+          const cols = row.split(",");
+          return {
+            matricula: cols[headers.indexOf("matricula")]?.trim(),
+            nome: cols[headers.indexOf("nome")]?.trim()
+          };
+        }).filter(m => m.matricula && m.nome);
+
+        // Mostrar prévia
+        tbody.innerHTML = "";
+        motoristas.forEach(m => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `<td>${m.matricula}</td><td>${m.nome}</td>`;
+          tbody.appendChild(tr);
+        });
+        previewTable.style.display = "table";
+        uploadBtn.style.display = "block";
+      };
+      reader.readAsText(file, "UTF-8");
+    });
+
+    uploadBtn.addEventListener("click", async () => {
+      if (!motoristas.length) return alert("Nenhum dado carregado.");
+
+      uploadBtn.disabled = true;
+      uploadBtn.textContent = "Enviando...";
+
+      const batch = db.batch();
+      const colecao = db.collection("motoristas");
+
+      motoristas.forEach(m => {
+        const ref = colecao.doc(m.matricula.toString());
+        batch.set(ref, m);
+      });
+
+      try {
+        await batch.commit();
+        alert(`✅ ${motoristas.length} registros enviados com sucesso!`);
+        uploadBtn.textContent = "Concluído!";
+      } catch (err) {
+        console.error(err);
+        alert("Erro ao enviar: " + err.message);
+      } finally {
+        uploadBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

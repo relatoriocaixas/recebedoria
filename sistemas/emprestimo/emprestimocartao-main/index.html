@@ -1,0 +1,206 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Empréstimo de Cartões</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="favicon.ico" type="image/x-icon">
+    <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
+
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+
+    <!-- jsPDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <script src="firebaseConfig.js"></script>
+    <script src="pdfGenerator.js"></script>
+    <script src="index.js"></script>
+</head>
+<body>
+<header>
+    <img src="logo.png" alt="Logo" class="logo">
+    <h1>Empréstimo de Cartões</h1>
+    <button id="relatorioBtn">📄 Relatório Mensal</button>
+ </header>
+
+<main>
+    <!-- Estoque encostado à esquerda -->
+    <aside id="estoque">
+        <h2>📦 Estoque</h2>
+        <div id="estoqueConteudo">Carregando...</div>
+    </aside>
+
+    <!-- Formulário -->
+    <form id="emprestimoForm">
+        <div class="form-group">
+            <label>Matrícula do Motorista:</label>
+            <input type="text" id="matriculaMotorista" required>
+        </div>
+
+        <div class="form-group">
+            <label>Nome do Motorista:</label>
+            <input type="text" id="nomeMotorista" required>
+        </div>
+
+        <div class="form-group">
+            <label>Tipo de Cartão:</label>
+            <select id="tipoCartao" required>
+                <option value="">Selecione</option>
+                <option value="digicon">DIGICON</option>
+                <option value="prodata">PRODATA</option>
+                <option value="meiaViagem">Meia Viagem</option>
+            </select>
+        </div>
+
+<div id="digiconField" class="form-group">
+  <label>N° Bordo Digicon:</label>
+  <select id="numBordoDigicon">
+    <option value="" disabled selected>Selecione</option>
+  </select>
+</div>
+
+<div id="prodataField" class="form-group">
+  <label>N° Bordo Prodata:</label>
+  <select id="numBordoProdata">
+    <option value="" disabled selected>Selecione</option>
+  </select>
+</div>
+
+<div id="meiaViagemField" class="form-group">
+  <label>N° Meia Viagem:</label>
+  <select id="numMeiaViagem">
+    <option value="" disabled selected>Selecione</option>
+  </select>
+</div>
+
+        <div class="form-group">
+            <label>Motivo:</label>
+            <select id="motivo" required>
+                <option value="">Selecione</option>
+                <option value="Perda">Perda</option>
+                <option value="Danificado">Danificado</option>
+                <option value="Roubo/Furto">Roubo/Furto</option>
+                <option value="Esquecido">Esquecido</option>
+                <option value="Outros">Outros</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Matrícula de quem está emprestando:</label>
+            <input type="text" id="matriculaEmpresto" required>
+        </div>
+
+        <div class="form-group">
+            <label>Data:</label>
+            <input type="text" id="dataRetirada" disabled>
+        </div>
+
+        <button type="submit" id="salvarBtn">Salvar Empréstimo</button>
+    </form>
+</main>
+
+<script>
+async function atualizarEstoque() {
+    const estoqueDiv = document.getElementById("estoqueConteudo");
+    estoqueDiv.innerHTML = "Atualizando...";
+
+    const total = { digicon: 10, prodata: 10, meiaViagem: 10 };
+    const emprestados = { digicon: [], prodata: [], meiaViagem: [] };
+
+    const snapshot = await db.collection("emprestimos")
+        .where("status", "==", "em aberto")
+        .get();
+
+    snapshot.forEach(doc => {
+        const data = doc.data();
+        if (data.tipoCartao === "digicon" && data.numBordoDigicon)
+            emprestados.digicon.push(Number(data.numBordoDigicon));
+        if (data.tipoCartao === "prodata" && data.numBordoProdata)
+            emprestados.prodata.push(Number(data.numBordoProdata));
+        if (data.numMeiaViagem)
+            emprestados.meiaViagem.push(Number(data.numMeiaViagem));
+    });
+
+    function gerarLista(tipo) {
+        const todos = Array.from({ length: total[tipo] }, (_, i) => i + 1);
+        const disponiveis = todos.filter(n => !emprestados[tipo].includes(n));
+        return `
+            <div class="cardEstoque">
+                <h3>${tipo === 'digicon' ? 'Bordo Digicon' : tipo === 'prodata' ? 'Bordo Prodata' : 'Meia Viagem'}</h3>
+                <p><b>Qtd. Disponível:</b> ${disponiveis.length}</p>
+                <p><b>Qtd. Emprestado:</b> ${emprestados[tipo].length}</p>
+                <p><b>N° Disponíveis:</b> ${disponiveis.join(', ') || '-'}</p>
+                <p><b>N° Emprestados:</b> ${emprestados[tipo].join(', ') || '-'}</p>
+            </div>`;
+    }
+
+    estoqueDiv.innerHTML =
+        gerarLista("digicon") +
+        gerarLista("prodata") +
+        gerarLista("meiaViagem");
+
+    atualizarSelects(emprestados, total);
+}
+
+function atualizarSelects(emprestados, total) {
+    const digiconSelect = document.getElementById("numBordoDigicon");
+    const prodataSelect = document.getElementById("numBordoProdata");
+    const meiaViagemSelect = document.getElementById("numMeiaViagem");
+
+    function preencher(select, tipo) {
+        select.innerHTML = '<option value="">Selecione</option>';
+        const todos = Array.from({ length: total[tipo] }, (_, i) => i + 1);
+        const disponiveis = todos.filter(n => !emprestados[tipo].includes(n));
+        disponiveis.forEach(n => {
+            const opt = document.createElement("option");
+            opt.value = n;
+            opt.textContent = n;
+            select.appendChild(opt);
+        });
+    }
+
+    preencher(digiconSelect, "digicon");
+    preencher(prodataSelect, "prodata");
+    preencher(meiaViagemSelect, "meiaViagem");
+}
+
+document.addEventListener("DOMContentLoaded", atualizarEstoque);
+
+document.addEventListener("DOMContentLoaded", () => {
+    const matriculaInput = document.getElementById("matriculaMotorista");
+    const nomeInput = document.getElementById("nomeMotorista");
+
+    matriculaInput.addEventListener("input", async () => {
+        const matricula = matriculaInput.value.trim();
+        if (!matricula) {
+            nomeInput.value = "";
+            return;
+        }
+
+        try {
+            const ref = db.collection("motoristas").doc(matricula);
+            const docSnap = await ref.get();
+
+            if (docSnap.exists) {
+                const dados = docSnap.data();
+                nomeInput.value = dados.nome || "";
+            } else {
+                nomeInput.value = "";
+            }
+        } catch (e) {
+            console.error("Erro ao buscar motorista:", e);
+        }
+    });
+});
+</script>
+
+<footer class="footer">
+    Developed by Lucas L Custodio
+</footer>
+
+</body>
+</html>

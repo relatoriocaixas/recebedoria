@@ -1,0 +1,23 @@
+<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=emprestimocartao-main/index.html"></head><body>
+<script>
+window.addEventListener('message', function(ev){
+    try{
+        const d = ev.data || {};
+        if(d && d.type === 'syncAuth' && d.usuario){
+            // write usuarioLogado to localStorage to mimic parent auth
+            try{
+                localStorage.setItem('usuarioLogado', JSON.stringify({ matricula: d.usuario.matricula, email: d.usuario.email, nome: d.usuario.nome }));
+            }catch(e){}
+            // optionally reload to let site detect login
+            // only reload if needed
+            if(!window.__authSynced){
+                window.__authSynced = true;
+                // give site a moment then reload
+                setTimeout(function(){ location.reload(); }, 400);
+            }
+        }
+    }catch(e){ console.error(e); }
+});
+</script>
+
+</body></html>
