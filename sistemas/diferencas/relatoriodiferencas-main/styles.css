@@ -191,3 +191,31 @@ textarea{resize:vertical;}
 .negativo{color:var(--danger); font-weight:bold;}
 .relatorio-item .actions{margin-top:10px; display:flex; gap:10px;}
 .btnEdit, .btnPos{padding:6px 10px; font-size:13px; border-radius:10px;}
+
+/* Botão excluir relatório (admin) */
+.btnDelete {
+  padding:6px 10px;
+  font-size:13px;
+  border-radius:10px;
+  background:linear-gradient(180deg,#ef5350,#b71c1c);
+  border:1px solid #a33;
+  color:#fff;
+  cursor:pointer;
+  transition:.2s;
+}
+.btnDelete:hover {
+  transform:translateY(-1px);
+  background:linear-gradient(180deg,#f44336,#b71c1c);
+}
+
+/* Badge metálica para pós conferência */
+.badge.posConf {
+  background: linear-gradient(135deg,#c0c0c0,#808080);
+  border:1px solid #999;
+  color:#000;
+  border-radius:999px;
+  padding:4px 8px;
+  font-size:12px;
+  font-weight:600;
+  text-shadow:0 1px 1px rgba(255,255,255,.3);
+}
