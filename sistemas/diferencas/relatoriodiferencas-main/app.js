@@ -12,7 +12,7 @@ import {
   doc,
   getDoc,
   deleteDoc
-} from "./firebaseConfig.js";
+} from "./firebaseConfig_v2.js";
 
 document.addEventListener("DOMContentLoaded", () => {
   console.log("[app] Iniciando app.js");
