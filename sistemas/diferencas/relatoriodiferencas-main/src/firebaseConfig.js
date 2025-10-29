@@ -22,7 +22,8 @@ import {
   query,
   where,
   serverTimestamp,
-  orderBy
+  orderBy,
+  deleteDoc // ✅ ADICIONADO AQUI
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
 // Configuração Firebase
@@ -61,5 +62,6 @@ export {
   query,
   where,
   serverTimestamp,
-  orderBy
+  orderBy,
+  deleteDoc // ✅ EXPORTADO TAMBÉM
 };
