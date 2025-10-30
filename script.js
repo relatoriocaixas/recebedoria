@@ -64,7 +64,7 @@ function openRoute(route) {
   frame.onload = async () => {
     // Aguarda envio de auth antes de liberar
     await sendAuthToIframe();
-    await new Promise(res => setTimeout(res, 500)); // 🔹 pequeno delay de segurança
+    await new Promise(res => setTimeout(res, 1200)); // 🔹 delay aumentado
     hideLoading();
   };
 
@@ -97,7 +97,7 @@ async function ensureUserInFirestore(user) {
     const parts = (user.email || '').split('@');
     const matricula = parts[0] || '';
     const domain = parts[1] || '';
-    const isAdmin = domain.toLowerCase() === 'movebuss.local'; // admin automático
+    const isAdmin = domain.toLowerCase() === 'movebuss.local';
 
     if (!userSnap.exists()) {
       await setDoc(userRef, {
@@ -123,7 +123,7 @@ async function ensureUserInFirestore(user) {
 
 // 🔹 Autenticação principal
 onAuthStateChanged(auth, async (user) => {
-  showLoading(); // 🔹 mantém a tela até a validação completa
+  showLoading(); // 🔹 mantém o overlay sempre até final da validação
 
   if (!user) {
     window.location.href = 'login.html';
@@ -131,8 +131,8 @@ onAuthStateChanged(auth, async (user) => {
   }
 
   try {
-    // 🔹 Espera o Firebase sincronizar totalmente
-    await new Promise(res => setTimeout(res, 800)); // aumenta tempo para evitar deslogar
+    // 🔹 Aumenta o tempo total de sincronização
+    await new Promise(res => setTimeout(res, 2500));
 
     sidebar.classList.remove('hidden');
 
@@ -148,9 +148,9 @@ onAuthStateChanged(auth, async (user) => {
 
     await ensureUserInFirestore(user);
 
-    // 🔹 Envia token inicial e aguarda sincronizar antes de mostrar tela
+    // 🔹 Envia token e aguarda confirmação adicional
     await sendAuthToIframe();
-    await new Promise(res => setTimeout(res, 600)); // atraso adicional de estabilidade
+    await new Promise(res => setTimeout(res, 1500)); // 🔹 delay adicional antes de mostrar a tela
 
     goHome();
   } catch (err) {
@@ -166,7 +166,7 @@ async function sendAuthToIframe() {
     const user = auth.currentUser;
     if (!user) return;
     const parts = (user.email || '').split('@');
-    const idToken = await user.getIdToken(true); // 🔹 força refresh do token
+    const idToken = await user.getIdToken(true);
     const payload = {
       type: 'syncAuth',
       usuario: {
