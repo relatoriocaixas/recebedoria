@@ -1,5 +1,9 @@
 import { auth, db } from "./firebaseConfig.js";
-import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+import {
+  onAuthStateChanged,
+  signOut,
+  updatePassword
+} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
 const sidebar = document.getElementById('sidebar');
@@ -136,17 +140,26 @@ logoutBtn.addEventListener('click', async () => {
   window.location.href = 'login.html';
 });
 
-// Botão alterar senha
+// ✅ Botão alterar senha (corrigido)
 changePassBtn.addEventListener('click', async () => {
   const user = auth.currentUser;
-  if (!user) return alert('Usuário não autenticado');
+  if (!user) return alert('Usuário não autenticado.');
+
   const nova = prompt('Digite a nova senha:');
   if (!nova) return;
+
   try {
-    await user.updatePassword(nova);
+    await updatePassword(user, nova);
     alert('Senha alterada com sucesso.');
   } catch (e) {
-    alert('Erro ao alterar senha: ' + (e?.message || e));
+    console.error('Erro ao alterar senha:', e);
+    if (e.code === 'auth/requires-recent-login') {
+      alert('Por segurança, faça login novamente antes de alterar a senha.');
+      await signOut(auth);
+      window.location.href = 'login.html';
+    } else {
+      alert('Erro ao alterar senha: ' + (e?.message || e));
+    }
   }
 });
 
