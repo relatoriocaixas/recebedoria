@@ -32,8 +32,12 @@ loadingOverlay.innerHTML = `
 `;
 document.body.appendChild(loadingOverlay);
 
-function showLoading() { loadingOverlay.style.display = 'flex'; }
-function hideLoading() { loadingOverlay.style.display = 'none'; }
+function showLoading() {
+  loadingOverlay.style.display = 'flex';
+}
+function hideLoading() {
+  loadingOverlay.style.display = 'none';
+}
 
 // 🔹 Função para ir à tela inicial
 function goHome() {
@@ -56,10 +60,11 @@ function openRoute(route) {
   iframeContainer.style.display = 'block';
   iframeContainer.classList.add('full');
 
-  // Remove listeners antigos para não duplicar
   frame.onload = null;
   frame.onload = async () => {
+    // Aguarda envio de auth antes de liberar
     await sendAuthToIframe();
+    await new Promise(res => setTimeout(res, 500)); // 🔹 pequeno delay de segurança
     hideLoading();
   };
 
@@ -92,7 +97,7 @@ async function ensureUserInFirestore(user) {
     const parts = (user.email || '').split('@');
     const matricula = parts[0] || '';
     const domain = parts[1] || '';
-    const isAdmin = domain.toLowerCase() === 'movebuss.local'; // 🔹 admin automático
+    const isAdmin = domain.toLowerCase() === 'movebuss.local'; // admin automático
 
     if (!userSnap.exists()) {
       await setDoc(userRef, {
@@ -118,9 +123,17 @@ async function ensureUserInFirestore(user) {
 
 // 🔹 Autenticação principal
 onAuthStateChanged(auth, async (user) => {
+  showLoading(); // 🔹 mantém a tela até a validação completa
+
   if (!user) {
     window.location.href = 'login.html';
-  } else {
+    return;
+  }
+
+  try {
+    // 🔹 Espera o Firebase sincronizar totalmente
+    await new Promise(res => setTimeout(res, 800)); // aumenta tempo para evitar deslogar
+
     sidebar.classList.remove('hidden');
 
     const parts = (user.email || '').split('@');
@@ -133,11 +146,17 @@ onAuthStateChanged(auth, async (user) => {
       sidebarBadge.textContent = parts[0];
     });
 
-    goHome();
     await ensureUserInFirestore(user);
 
-    // Envia token inicial
-    sendAuthToIframe();
+    // 🔹 Envia token inicial e aguarda sincronizar antes de mostrar tela
+    await sendAuthToIframe();
+    await new Promise(res => setTimeout(res, 600)); // atraso adicional de estabilidade
+
+    goHome();
+  } catch (err) {
+    console.error("Erro no carregamento inicial:", err);
+  } finally {
+    hideLoading();
   }
 });
 
@@ -147,7 +166,7 @@ async function sendAuthToIframe() {
     const user = auth.currentUser;
     if (!user) return;
     const parts = (user.email || '').split('@');
-    const idToken = await user.getIdToken();
+    const idToken = await user.getIdToken(true); // 🔹 força refresh do token
     const payload = {
       type: 'syncAuth',
       usuario: {
@@ -171,7 +190,7 @@ logoutBtn.addEventListener('click', async () => {
   window.location.href = 'login.html';
 });
 
-// 🔹 Botão alterar senha (mantém a lógica original)
+// 🔹 Botão alterar senha
 changePassBtn.addEventListener('click', async () => {
   const user = auth.currentUser;
   if (!user) return alert('Usuário não autenticado.');
