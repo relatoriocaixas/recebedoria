@@ -1,251 +1,325 @@
 // app.js
-import {
-  auth, db
+import { 
+  auth, db, onAuthStateChanged, collection, getDocs, query, where, orderBy, addDoc, doc, getDoc, updateDoc, deleteDoc, serverTimestamp
 } from "./firebaseConfig.js";
-import {
-  onAuthStateChanged,
-  signOut,
-  updatePassword
-} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
-import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
-// ===========================
-// Elementos do DOM
-// ===========================
-const sidebar = document.getElementById('sidebar');
-const logoutBtn = document.getElementById('logoutBtn');
-const changePassBtn = document.getElementById('changePassBtn');
-const sidebarBadge = document.getElementById('sidebarBadge');
-const frame = document.getElementById('mainFrame');
-const iframeContainer = document.getElementById('iframeContainer');
-const avisosSection = document.getElementById('avisosSection');
-const dataVigenteSpan = document.getElementById('dataVigente');
+document.addEventListener("DOMContentLoaded", () => {
+  console.log("[app] Iniciando app.js");
 
-// ===========================
-// Rotas do portal
-// ===========================
-const ROUTES = {
-  home: null,
-  abastecimento: "sistemas/abastecimento/index.html",
-  emprestimo: "sistemas/emprestimo/index.html",
-  relatorios: "sistemas/emprestimo/emprestimocartao-main/relatorio.html",
-  diferencas: "sistemas/diferencas/index.html"
-};
+  // Atualiza automaticamente o sobra/falta no formulário
+  const valorFolhaInput = document.getElementById("valorFolha");
+  const valorDinheiroInput = document.getElementById("valorDinheiro");
+  const sobraFaltaInput = document.getElementById("sobraFalta");
 
-// ===========================
-// Tela de carregamento
-// ===========================
-const loadingOverlay = document.createElement('div');
-loadingOverlay.id = 'loadingOverlay';
-loadingOverlay.innerHTML = `
-  <div class="spinner"></div>
-  <div>Carregando...</div>
-`;
-document.body.appendChild(loadingOverlay);
-
-function showLoading() { loadingOverlay.style.display = 'flex'; }
-function hideLoading() { loadingOverlay.style.display = 'none'; }
-
-// ===========================
-// Funções de interface
-// ===========================
-function goHome() {
-  iframeContainer.classList.remove('full');
-  iframeContainer.style.display = 'none';
-  avisosSection.style.display = 'block';
-  sidebar.style.display = 'flex';
-}
-
-function openRoute(route) {
-  const src = ROUTES[route];
-  if (!src) {
-    goHome();
-    return;
+  if (valorFolhaInput && valorDinheiroInput && sobraFaltaInput) {
+    const atualizarSobra = () => {
+      const folha = parseFloat(valorFolhaInput.value) || 0;
+      const dinheiro = parseFloat(valorDinheiroInput.value) || 0;
+      sobraFaltaInput.value = (dinheiro - folha).toFixed(2);
+    };
+    valorFolhaInput.addEventListener("input", atualizarSobra);
+    valorDinheiroInput.addEventListener("input", atualizarSobra);
   }
 
-  showLoading();
-  avisosSection.style.display = 'none';
-  iframeContainer.style.display = 'block';
-  iframeContainer.classList.add('full');
+  onAuthStateChanged(auth, async (user) => {
+    if (!user) {
+      window.location.href = "/login.html";
+      return;
+    }
 
-  // Remove listeners antigos
-  frame.onload = null;
-  frame.onload = async () => {
-    // Envia auth assim que o iframe carrega
-    await broadcastAuthToIframe(frame);
-    hideLoading();
-  };
+    console.log("[app] onAuthStateChanged fired — user:", user.uid);
 
-  frame.src = src;
-}
-
-// ===========================
-// Atualiza data atual
-// ===========================
-if (dataVigenteSpan) {
-  const hoje = new Date();
-  const dia = String(hoje.getDate()).padStart(2, '0');
-  const mes = String(hoje.getMonth() + 1).padStart(2, '0');
-  const ano = hoje.getFullYear();
-  dataVigenteSpan.textContent = `${dia}/${mes}/${ano}`;
-}
-
-// ===========================
-// Garante que o usuário exista no Firestore
-// ===========================
-async function ensureUserInFirestore(user) {
-  try {
     const userRef = doc(db, "users", user.uid);
     const userSnap = await getDoc(userRef);
-    const parts = (user.email || '').split('@');
-    const matricula = parts[0] || '';
-    const domain = parts[1] || '';
-    const isAdmin = domain.toLowerCase() === 'movebuss.local';
-
     if (!userSnap.exists()) {
-      await setDoc(userRef, {
-        uid: user.uid,
-        email: user.email || '',
-        matricula,
-        nome: user.displayName || matricula,
-        admin: isAdmin,
-        createdAt: new Date()
+      alert("Seu cadastro não está completo. Faça login novamente.");
+      await auth.signOut();
+      return;
+    }
+
+    const userData = userSnap.data();
+    const IS_ADMIN = userData.admin === true;
+    const MATRICULA = userData.matricula;
+
+    configurarInterface(IS_ADMIN);
+    await popularSelects(IS_ADMIN);
+    inicializarEventos(IS_ADMIN, MATRICULA);
+    carregarRelatorios(IS_ADMIN, MATRICULA);
+    carregarResumoMensal(IS_ADMIN);
+  });
+});
+
+// ===========================
+// Interface
+// ===========================
+function configurarInterface(admin) {
+  document.querySelectorAll(".admin-only").forEach(el => el.hidden = !admin);
+  document.querySelectorAll(".user-only").forEach(el => el.hidden = admin);
+}
+
+// ===========================
+// Popula selects de matrícula (corrigido)
+// ===========================
+async function popularSelects(admin) {
+  const selectForm = document.getElementById("matriculaForm");
+  const selectResumo = document.getElementById("selectMatriculas");
+  const filtroMatricula = document.getElementById("filtroMatricula"); // correção
+
+  const snapshot = await getDocs(collection(db, "users"));
+  const matriculas = [];
+
+  snapshot.forEach(docSnap => {
+    const u = docSnap.data();
+    if (u.matricula) matriculas.push(u);
+  });
+
+  matriculas.sort((a, b) => a.matricula.localeCompare(b.matricula, 'pt-BR', { numeric: true }));
+
+  [selectForm, selectResumo, filtroMatricula].forEach(sel => {
+    if (!sel) return;
+    sel.innerHTML = '<option value="">Selecione uma matrícula</option>';
+    matriculas.forEach(u => {
+      const opt = document.createElement("option");
+      opt.value = u.matricula;
+      opt.textContent = `${u.matricula} - ${u.nome}`;
+      sel.appendChild(opt);
+    });
+  });
+
+  console.log("[app] Selects populados:", matriculas.map(m => m.matricula));
+}
+
+// ===========================
+// Eventos
+// ===========================
+function inicializarEventos(admin, matricula) {
+  const btnSalvarRelatorio = document.getElementById("btnSalvarRelatorio");
+  const btnCarregarResumo = document.getElementById("btnCarregarResumo");
+  const btnToggleResumo = document.getElementById("btnToggleResumo");
+  const btnLogout = document.getElementById("btnLogout");
+  const filtroResumo = document.getElementById("verApenas");
+
+  if (btnSalvarRelatorio) btnSalvarRelatorio.addEventListener("click", () => salvarRelatorio(admin));
+  if (btnCarregarResumo) btnCarregarResumo.addEventListener("click", () => carregarResumoMensal(admin));
+  if (btnToggleResumo) btnToggleResumo.addEventListener("click", () => document.getElementById("resumoWrap").classList.toggle("collapsed"));
+  if (btnLogout) btnLogout.addEventListener("click", () => auth.signOut().then(() => window.location.href = "/login.html"));
+
+  // Filtro "Ver apenas" restaurado
+  if (filtroResumo) {
+    filtroResumo.addEventListener("change", () => carregarResumoMensal(admin));
+  }
+}
+
+// ===========================
+// Salvar relatório
+// ===========================
+async function salvarRelatorio(admin) {
+  if (!admin) { alert("Apenas administradores podem criar relatórios."); return; }
+
+  const matricula = document.getElementById("matriculaForm").value;
+  const dataCaixa = document.getElementById("dataCaixa").value;
+  const valorFolha = parseFloat(document.getElementById("valorFolha").value) || 0;
+  const valorDinheiro = parseFloat(document.getElementById("valorDinheiro").value) || 0;
+  const sobraFalta = valorDinheiro - valorFolha;
+  const observacao = document.getElementById("observacao").value || "";
+  const createdBy = auth.currentUser.uid;
+
+  if (!matricula || !dataCaixa) { alert("Preencha todos os campos."); return; }
+
+  try {
+    await addDoc(collection(db, "relatorios"), {
+      createdBy,
+      criadoEm: serverTimestamp(),
+      dataCaixa: new Date(dataCaixa),
+      imagemPath: "",
+      matricula,
+      observacao,
+      posEditado: false,
+      posTexto: "",
+      sobraFalta,
+      valorDinheiro,
+      valorFolha
+    });
+    alert("Relatório salvo!");
+    carregarRelatorios(true, matricula);
+  } catch (e) {
+    console.error("Erro ao salvar relatório:", e);
+    alert("Erro ao salvar relatório.");
+  }
+}
+
+// ===========================
+// Carregar relatórios
+// ===========================
+async function carregarRelatorios(admin, userMatricula) {
+  const lista = document.getElementById("listaRelatorios");
+  lista.innerHTML = "";
+
+  try {
+    let q;
+    if (admin) {
+      q = query(collection(db, "relatorios"), orderBy("criadoEm", "desc"));
+    } else {
+      q = query(collection(db, "relatorios"), where("matricula", "==", userMatricula), orderBy("criadoEm", "desc"));
+    }
+
+    const snapshot = await getDocs(q);
+
+    snapshot.forEach(docSnap => {
+      const r = docSnap.data();
+      const tr = document.createElement("div");
+      tr.className = "relatorio-item";
+
+      const diferencaClass = r.sobraFalta >= 0 ? "positivo" : "negativo";
+
+      tr.innerHTML = `
+        <div class="item-header">
+          <strong>${r.dataCaixa instanceof Object && r.dataCaixa.toDate ? r.dataCaixa.toDate().toLocaleDateString() : new Date(r.dataCaixa).toLocaleDateString()}</strong> — Matrícula: ${r.matricula}
+          <button class="btn outline btnToggle" data-id="${docSnap.id}">Ocultar/Exibir</button>
+        </div>
+        <div class="item-body hidden">
+          <table class="relatorio-table">
+            <tr><td>Folha:</td><td>R$ ${r.valorFolha.toFixed(2)}</td></tr>
+            <tr><td>Dinheiro:</td><td>R$ ${r.valorDinheiro.toFixed(2)}</td></tr>
+            <tr><td>Diferença:</td><td class="${diferencaClass}">R$ ${r.sobraFalta.toFixed(2)}</td></tr>
+            <tr><td>Observação:</td><td>${r.observacao || "-"}</td></tr>
+          </table>
+          <div class="actions">
+            <button class="btn outline btnPos" data-id="${docSnap.id}">Pós Conferência</button>
+            ${admin ? `<button class="btn primary btnEdit" data-id="${docSnap.id}">Editar</button>` : ""}
+          </div>
+        </div>
+      `;
+
+      lista.appendChild(tr);
+    });
+
+    document.querySelectorAll(".btnToggle").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const body = btn.closest(".relatorio-item").querySelector(".item-body");
+        body.classList.toggle("hidden");
       });
-      console.log("Usuário adicionado à coleção 'users'.");
-    } else {
-      const existing = userSnap.data();
-      if (existing.admin !== isAdmin) {
-        await setDoc(userRef, { ...existing, admin: isAdmin }, { merge: true });
-        console.log("Campo 'admin' atualizado conforme domínio.");
-      }
-    }
+    });
+
+    document.querySelectorAll(".btnPos").forEach(btn => {
+      btn.addEventListener("click", () => abrirPosConferencia(btn.dataset.id, admin));
+    });
+
+    document.querySelectorAll(".btnEdit").forEach(btn => {
+      btn.addEventListener("click", () => editarRelatorio(btn.dataset.id));
+    });
+
   } catch (e) {
-    console.error("Erro ao salvar usuário em 'users':", e);
+    console.error("Erro ao carregar relatórios:", e);
   }
 }
 
 // ===========================
-// Envia auth para todos os iframes
+// Pós-Conferência
 // ===========================
-async function broadcastAuthToIframe(targetFrame = null) {
-  const user = auth.currentUser;
-  if (!user) return;
+async function abrirPosConferencia(id, admin) {
+  const modal = document.getElementById("posModal");
+  const textarea = document.getElementById("posTexto");
+  modal.showModal();
 
-  const idToken = await user.getIdToken(true);
-  const payload = {
-    type: 'syncAuth',
-    usuario: {
-      email: user.email || '',
-      nome: user.displayName || '',
-      matricula: (user.email || '').split('@')[0]
-    },
-    idToken
+  const docRef = doc(db, "relatorios", id);
+  const docSnap = await getDoc(docRef);
+  if (docSnap.exists()) {
+    textarea.value = docSnap.data().posTexto || "";
+    textarea.disabled = !admin;
+  }
+
+  document.getElementById("btnSalvarPos").onclick = async () => {
+    if (!admin) return;
+    await updateDoc(docRef, {
+      posTexto: textarea.value,
+      posEditado: true
+    });
+    alert("Pós Conferência salva!");
+    modal.close();
+    carregarRelatorios(true, "");
   };
-
-  // Se targetFrame fornecido, envia apenas para ele
-  if (targetFrame && targetFrame.contentWindow) {
-    targetFrame.contentWindow.postMessage(payload, '*');
-    return;
-  }
-
-  // Senão, envia para todos os iframes existentes
-  document.querySelectorAll('iframe').forEach(f => {
-    if (f.contentWindow) f.contentWindow.postMessage(payload, '*');
-  });
 }
 
 // ===========================
-// Autenticação principal
+// Editar relatório (Admin)
 // ===========================
-onAuthStateChanged(auth, async (user) => {
-  showLoading();
-  if (!user) {
-    // NÃO redirecionar. apenas colocar a UI em modo "aguardando"
-    sidebar.classList.add('hidden');
-    // mantenha página ativa (o portal controla a experiência)
-    hideLoading();
-    return;
-  }
+async function editarRelatorio(id) {
+  const docRef = doc(db, "relatorios", id);
+  const docSnap = await getDoc(docRef);
+  if (!docSnap.exists()) return;
 
-  try {
-    sidebar.classList.remove('hidden');
+  const r = docSnap.data();
+  const novoFolha = parseFloat(prompt("Valor Folha:", r.valorFolha)) || r.valorFolha;
+  const novoDin = parseFloat(prompt("Valor Dinheiro:", r.valorDinheiro)) || r.valorDinheiro;
+  const novaObs = prompt("Observação:", r.observacao || "") || r.observacao;
+  const novaDif = novoDin - novoFolha;
 
-    const parts = (user.email || '').split('@');
-    sidebarBadge.textContent = parts[0];
-
-    sidebar.addEventListener('mouseenter', () => {
-      sidebarBadge.textContent = (user.displayName || 'Usuário') + ' • ' + parts[0];
-    });
-    sidebar.addEventListener('mouseleave', () => {
-      sidebarBadge.textContent = parts[0];
-    });
-
-    await ensureUserInFirestore(user);
-
-    // envia auth para todos os iframes existentes
-    await broadcastAuthToIframe();
-
-    goHome();
-  } catch (err) {
-    console.error("Erro no carregamento inicial:", err);
-  } finally {
-    hideLoading();
-  }
-});
-
-// ===========================
-// Atalhos da barra lateral
-// ===========================
-document.querySelectorAll('.sidebar li').forEach(li => {
-  li.addEventListener('click', () => {
-    const t = li.dataset.target;
-    if (t === 'home') goHome();
-    else openRoute(t);
+  await updateDoc(docRef, {
+    valorFolha: novoFolha,
+    valorDinheiro: novoDin,
+    sobraFalta: novaDif,
+    observacao: novaObs
   });
-});
+
+  alert("Relatório atualizado!");
+  carregarRelatorios(true, "");
+}
 
 // ===========================
-// Botão sair
+// Resumo mensal
 // ===========================
-logoutBtn.addEventListener('click', async () => {
-  await signOut(auth);
-  // não redirecionar aqui; deixar o portal controlar navegação.
-  // manter comportamento antigo: enviar para login.html se desejar, mas como o portal gerencia login, apenas esconder UI.
-  sidebar.classList.add('hidden');
-  iframeContainer.style.display = 'none';
-  avisosSection.style.display = 'none';
-  window.location.href = 'login.html'; // opcional: manter para casos isolados
-});
+async function carregarResumoMensal(admin) {
+  if (!admin) return;
 
-// ===========================
-// Botão alterar senha
-// ===========================
-changePassBtn.addEventListener('click', async () => {
-  const user = auth.currentUser;
-  if (!user) return alert('Usuário não autenticado.');
+  const select = document.getElementById("selectMatriculas");
+  const matricula = select.value;
+  if (!matricula) return;
 
-  const nova = prompt('Digite a nova senha:');
-  if (!nova) return;
+  const mesInput = document.getElementById("mesResumo");
+  if (!mesInput.value) {
+    const now = new Date();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    mesInput.value = `${now.getFullYear()}-${month}`;
+  }
+
+  const [year, month] = mesInput.value.split("-").map(Number);
+  const start = new Date(year, month - 1, 1);
+  const end = new Date(year, month, 0, 23, 59, 59, 999);
 
   try {
-    await updatePassword(user, nova);
-    alert('Senha alterada com sucesso.');
-  } catch (e) {
-    console.error('Erro ao alterar senha:', e);
-    if (e.code === 'auth/requires-recent-login') {
-      alert('Por segurança, faça login novamente antes de alterar a senha.');
-      await signOut(auth);
-      window.location.href = 'login.html';
-    } else {
-      alert('Erro ao alterar senha: ' + (e?.message || e));
-    }
-  }
-});
+    const q = query(collection(db, "relatorios"), where("matricula", "==", matricula), orderBy("criadoEm", "desc"));
+    const snapshot = await getDocs(q);
 
-// ===========================
-// Listener global para iframes
-// ===========================
-window.addEventListener('message', (e) => {
-  // aqui você pode tratar mensagens de retorno dos iframes se necessário
-  // Ex.: respostas de impressão, pedidos de reload, etc.
-});
+    let totalFolha = 0;
+    let saldo = 0;
+    const detalhesPos = [];
+    const detalhesNeg = [];
+
+    snapshot.forEach(docSnap => {
+      const r = docSnap.data();
+      const dt = r.dataCaixa.toDate ? r.dataCaixa.toDate() : new Date(r.dataCaixa);
+      if (dt >= start && dt <= end) {
+        const vf = Number(r.valorFolha || 0);
+        const vd = Number(r.valorDinheiro || 0);
+        const diff = vd - vf;
+        totalFolha += vf;
+        saldo += diff;
+        (diff >= 0 ? detalhesPos : detalhesNeg).push(`${dt.toLocaleDateString()}: R$ ${diff.toFixed(2)}`);
+      }
+    });
+
+    document.getElementById("resumoTotalFolha").textContent = `R$ ${totalFolha.toFixed(2)}`;
+    document.getElementById("resumoSaldo").textContent = `R$ ${saldo.toFixed(2)}`;
+    document.getElementById("resumoSituacao").textContent = saldo >= 0 ? "Positivo" : "Negativo";
+
+    const lista = document.getElementById("resumoLista");
+    lista.innerHTML = `
+      <details><summary>Dias com sobra</summary>${detalhesPos.join("<br>") || "-"}</details>
+      <details><summary>Dias com falta</summary>${detalhesNeg.join("<br>") || "-"}</details>
+    `;
+
+  } catch (e) {
+    console.error("Erro ao carregar resumo:", e);
+  }
+}

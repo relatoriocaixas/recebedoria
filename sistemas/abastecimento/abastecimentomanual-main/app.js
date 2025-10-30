@@ -1,7 +1,7 @@
 // app.js (adaptado para usar apenas o Firebase do portal)
 // importa do firebase.js (já configurado para o projeto unificado)
 import {
-  auth, db, onAuthStateChanged, signOut, updatePassword,
+  auth, db, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, updatePassword,
   doc, setDoc, getDoc, updateDoc, addDoc, getDocs, collection, query, where, serverTimestamp, orderBy
 } from './firebaseConfig.js';
 
@@ -75,6 +75,9 @@ if (prefixo) {
 // Data default
 if (dataCaixa) dataCaixa.value = todayISO();
 
+// ---- Removed login/register listeners (we use portal auth) ----
+// NOTE: login/register code removed to avoid conflicts with portal auth
+
 // Keep logout and change password handlers (they operate on portal auth)
 if (btnLogout) {
   btnLogout.addEventListener('click', async () => {
@@ -103,14 +106,6 @@ if (btnChangePass) {
   });
 }
 
-/*
-  Observação importante: aqui nós **não** redirecionamos para a página de login quando
-  `onAuthStateChanged` indica que não há user. Em vez disso deixamos a UI escondida /
-  em modo "aguardando login" — isso evita que o iframe force logout quando o portal
-  gerencia a autenticação. Além disso adicionamos um listener `message` para aceitar
-  o `syncAuth` enviado pelo portal caso ele queira "empurrar" o estado.
-*/
-
 // onAuthStateChanged: integra com o portal (sem redirecionamentos)
 onAuthStateChanged(auth, async (user) => {
   if (!user) {
@@ -125,7 +120,7 @@ onAuthStateChanged(auth, async (user) => {
     return;
   }
 
-  // Usuário autenticado no portal/local — carregar perfil do Firestore
+  // Usuário autenticado no portal — carregar perfil do Firestore
   try {
     const uref = doc(db, 'users', user.uid);
     const snap = await getDoc(uref);
@@ -164,49 +159,6 @@ onAuthStateChanged(auth, async (user) => {
   } catch (e) {
     console.error('Erro ao ler dados do usuário:', e);
     alert('Erro ao carregar perfil do usuário: ' + (e?.message || e));
-  }
-});
-
-// Listener para receber broadcast do portal (syncAuth)
-window.addEventListener('message', async (ev) => {
-  try {
-    const data = ev?.data;
-    if (!data || data.type !== 'syncAuth') return;
-
-    // O portal envia: { type: 'syncAuth', usuario: {...}, idToken }
-    // Não vamos forçar sign-in aqui — se auth.currentUser existir, onAuthStateChanged cuidará.
-    // Mas podemos usar as infos para atualizar a UI caso necessário.
-    const usuario = data.usuario || null;
-    if (usuario) {
-      // Se não há currentUser (por alguma razão), apenas atualizamos partes da UI right away
-      if (!auth.currentUser) {
-        // Apenas exibe badge com matricula/nome quando não houver currentUser local
-        if (userBadge && usuario.matricula) {
-          userBadge.textContent = `${usuario.nome || usuario.matricula} • ${usuario.matricula}`;
-          userBadge.classList.remove('hidden');
-        }
-      } else {
-        // Se há currentUser, onAuthStateChanged que já foi disparado fará o restante.
-        // Mas por via das dúvidas, forçamos uma tentativa de leitura do Firestore.
-        try {
-          const uref = doc(db, 'users', auth.currentUser.uid);
-          const snap = await getDoc(uref);
-          if (snap.exists()) {
-            currentUserDoc = snap.data();
-            if (matRecebedor && currentUserDoc?.matricula) matRecebedor.value = currentUserDoc.matricula;
-            if (userBadge) {
-              userBadge.textContent = `${currentUserDoc.nome} • ${currentUserDoc.matricula}`;
-              userBadge.classList.remove('hidden');
-            }
-            await detectOrUpdateCaixaStatus();
-          }
-        } catch (e) {
-          console.warn('syncAuth -> falha ao confirmar user no Firestore:', e);
-        }
-      }
-    }
-  } catch (e) {
-    console.warn('Mensagem recebida inesperada:', e);
   }
 });
 
