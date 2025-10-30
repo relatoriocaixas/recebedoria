@@ -37,10 +37,14 @@ function hideLoading() { loadingOverlay.style.display = 'none'; }
 
 // 🔹 Função para ir à tela inicial
 function goHome() {
-  iframeContainer.classList.remove('full');
-  iframeContainer.style.display = 'none';
-  avisosSection.style.display = 'block';
-  sidebar.style.display = 'flex';
+  showLoading();
+  setTimeout(() => {
+    iframeContainer.classList.remove('full');
+    iframeContainer.style.display = 'none';
+    avisosSection.style.display = 'block';
+    sidebar.style.display = 'flex';
+    hideLoading();
+  }, 10000); // 10 segundos de carregamento
 }
 
 // 🔹 Função para abrir uma rota no iframe
@@ -56,11 +60,10 @@ function openRoute(route) {
   iframeContainer.style.display = 'block';
   iframeContainer.classList.add('full');
 
-  // Remove listeners antigos para não duplicar
   frame.onload = null;
   frame.onload = async () => {
     await sendAuthToIframe();
-    hideLoading();
+    setTimeout(() => hideLoading(), 10000); // 10 segundos de carregamento
   };
 
   frame.src = src;
@@ -118,6 +121,7 @@ async function ensureUserInFirestore(user) {
 
 // 🔹 Autenticação principal
 onAuthStateChanged(auth, async (user) => {
+  showLoading();
   if (!user) {
     window.location.href = 'login.html';
   } else {
@@ -133,11 +137,16 @@ onAuthStateChanged(auth, async (user) => {
       sidebarBadge.textContent = parts[0];
     });
 
-    goHome();
     await ensureUserInFirestore(user);
 
-    // Envia token inicial
+    // envia token inicial
     sendAuthToIframe();
+
+    // Mantém o overlay 10 segundos ao carregar
+    setTimeout(() => {
+      goHome();
+      hideLoading();
+    }, 10000);
   }
 });
 
@@ -171,7 +180,7 @@ logoutBtn.addEventListener('click', async () => {
   window.location.href = 'login.html';
 });
 
-// 🔹 Botão alterar senha (mantém a lógica original)
+// 🔹 Botão alterar senha
 changePassBtn.addEventListener('click', async () => {
   const user = auth.currentUser;
   if (!user) return alert('Usuário não autenticado.');
