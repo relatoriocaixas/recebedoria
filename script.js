@@ -23,6 +23,7 @@ const ROUTES = {
   diferencas: "sistemas/diferencas/index.html"
 };
 
+// 🔹 Função para ir à tela inicial
 function goHome() {
   iframeContainer.classList.remove('full');
   iframeContainer.style.display = 'none';
@@ -30,17 +31,25 @@ function goHome() {
   sidebar.style.display = 'flex';
 }
 
+// 🔹 Função para abrir uma rota no iframe
 function openRoute(route) {
   const src = ROUTES[route];
-  if (!src) { goHome(); return; }
+  if (!src) {
+    goHome();
+    return;
+  }
   avisosSection.style.display = 'none';
   iframeContainer.style.display = 'block';
   iframeContainer.classList.add('full');
   frame.src = src;
-  setTimeout(sendAuthToIframe, 500);
+
+  // Reenvia autenticação quando o iframe terminar de carregar
+  frame.addEventListener('load', () => {
+    setTimeout(sendAuthToIframe, 400);
+  });
 }
 
-// Atalhos da barra lateral
+// 🔹 Atalhos da barra lateral (corrigido)
 document.querySelectorAll('.sidebar li').forEach(li => {
   li.addEventListener('click', () => {
     const t = li.dataset.target;
@@ -49,7 +58,7 @@ document.querySelectorAll('.sidebar li').forEach(li => {
   });
 });
 
-// Atualiza o #dataVigente com a data atual
+// 🔹 Atualiza o #dataVigente com a data atual
 if (dataVigenteSpan) {
   const hoje = new Date();
   const dia = String(hoje.getDate()).padStart(2, '0');
@@ -79,7 +88,6 @@ async function ensureUserInFirestore(user) {
       });
       console.log("Usuário adicionado à coleção 'users'.");
     } else {
-      // Atualiza se o domínio mudar ou admin for diferente
       const existing = userSnap.data();
       if (existing.admin !== isAdmin) {
         await setDoc(userRef, { ...existing, admin: isAdmin }, { merge: true });
@@ -91,7 +99,7 @@ async function ensureUserInFirestore(user) {
   }
 }
 
-// Auth e badge
+// 🔹 Autenticação principal
 onAuthStateChanged(auth, async (user) => {
   if (!user) {
     window.location.href = 'login.html';
@@ -109,61 +117,14 @@ onAuthStateChanged(auth, async (user) => {
     });
 
     goHome();
-
-    // 🔹 Garante que o usuário esteja na coleção "users"
     await ensureUserInFirestore(user);
 
-    // Envia auth para iframe
-    try {
-      const idToken = await user.getIdToken();
-      const payload = {
-        type: 'syncAuth',
-        usuario: {
-          matricula: parts[0] || '',
-          email: user.email || '',
-          nome: user.displayName || ''
-        },
-        idToken
-      };
-      if (frame && frame.contentWindow) {
-        frame.contentWindow.postMessage(payload, '*');
-      }
-    } catch (e) {
-      console.warn('erro ao enviar token ao iframe', e);
-    }
+    // Envia token inicial
+    sendAuthToIframe();
   }
 });
 
-// Botão sair
-logoutBtn.addEventListener('click', async () => {
-  await signOut(auth);
-  window.location.href = 'login.html';
-});
-
-// ✅ Botão alterar senha (corrigido)
-changePassBtn.addEventListener('click', async () => {
-  const user = auth.currentUser;
-  if (!user) return alert('Usuário não autenticado.');
-
-  const nova = prompt('Digite a nova senha:');
-  if (!nova) return;
-
-  try {
-    await updatePassword(user, nova);
-    alert('Senha alterada com sucesso.');
-  } catch (e) {
-    console.error('Erro ao alterar senha:', e);
-    if (e.code === 'auth/requires-recent-login') {
-      alert('Por segurança, faça login novamente antes de alterar a senha.');
-      await signOut(auth);
-      window.location.href = 'login.html';
-    } else {
-      alert('Erro ao alterar senha: ' + (e?.message || e));
-    }
-  }
-});
-
-// Função original de enviar auth para iframe
+// 🔹 Envio seguro do auth
 async function sendAuthToIframe() {
   try {
     const user = auth.currentUser;
@@ -186,3 +147,32 @@ async function sendAuthToIframe() {
     console.warn('sendAuthToIframe error', e);
   }
 }
+
+// 🔹 Botão sair
+logoutBtn.addEventListener('click', async () => {
+  await signOut(auth);
+  window.location.href = 'login.html';
+});
+
+// 🔹 Botão alterar senha (mantém a lógica original)
+changePassBtn.addEventListener('click', async () => {
+  const user = auth.currentUser;
+  if (!user) return alert('Usuário não autenticado.');
+
+  const nova = prompt('Digite a nova senha:');
+  if (!nova) return;
+
+  try {
+    await updatePassword(user, nova);
+    alert('Senha alterada com sucesso.');
+  } catch (e) {
+    console.error('Erro ao alterar senha:', e);
+    if (e.code === 'auth/requires-recent-login') {
+      alert('Por segurança, faça login novamente antes de alterar a senha.');
+      await signOut(auth);
+      window.location.href = 'login.html';
+    } else {
+      alert('Erro ao alterar senha: ' + (e?.message || e));
+    }
+  }
+});
