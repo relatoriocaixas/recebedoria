@@ -23,6 +23,18 @@ const ROUTES = {
   diferencas: "sistemas/diferencas/index.html"
 };
 
+// 🔹 Tela de carregamento
+const loadingOverlay = document.createElement('div');
+loadingOverlay.id = 'loadingOverlay';
+loadingOverlay.innerHTML = `
+  <div class="spinner"></div>
+  <div>Carregando...</div>
+`;
+document.body.appendChild(loadingOverlay);
+
+function showLoading() { loadingOverlay.style.display = 'flex'; }
+function hideLoading() { loadingOverlay.style.display = 'none'; }
+
 // 🔹 Função para ir à tela inicial
 function goHome() {
   iframeContainer.classList.remove('full');
@@ -31,38 +43,27 @@ function goHome() {
   sidebar.style.display = 'flex';
 }
 
-// 🔹 Função para abrir uma rota no iframe com tela de carregamento
+// 🔹 Função para abrir uma rota no iframe
 function openRoute(route) {
   const src = ROUTES[route];
-  if (!src) { goHome(); return; }
+  if (!src) {
+    goHome();
+    return;
+  }
 
+  showLoading();
   avisosSection.style.display = 'none';
   iframeContainer.style.display = 'block';
   iframeContainer.classList.add('full');
 
-  // 🔹 Tela de carregamento
-  const loading = document.createElement('div');
-  loading.id = 'iframeLoading';
-  loading.style.position = 'absolute';
-  loading.style.top = '0';
-  loading.style.left = '0';
-  loading.style.width = '100%';
-  loading.style.height = '100%';
-  loading.style.background = 'rgba(0,0,0,0.5)';
-  loading.style.display = 'flex';
-  loading.style.alignItems = 'center';
-  loading.style.justifyContent = 'center';
-  loading.style.zIndex = '9999';
-  loading.style.color = '#fff';
-  loading.style.fontSize = '1.5rem';
-  loading.textContent = 'Carregando...';
-  iframeContainer.appendChild(loading);
+  // Remove listeners antigos para não duplicar
+  frame.onload = null;
+  frame.onload = async () => {
+    await sendAuthToIframe();
+    hideLoading();
+  };
 
-  // 🔹 Substitui src
   frame.src = src;
-
-  // 🔹 Reenvia auth quando o iframe terminar de carregar
-  frame.onload = () => sendAuthToIframe();
 }
 
 // 🔹 Atalhos da barra lateral
@@ -91,7 +92,7 @@ async function ensureUserInFirestore(user) {
     const parts = (user.email || '').split('@');
     const matricula = parts[0] || '';
     const domain = parts[1] || '';
-    const isAdmin = domain.toLowerCase() === 'movebuss.local';
+    const isAdmin = domain.toLowerCase() === 'movebuss.local'; // 🔹 admin automático
 
     if (!userSnap.exists()) {
       await setDoc(userRef, {
@@ -135,7 +136,7 @@ onAuthStateChanged(auth, async (user) => {
     goHome();
     await ensureUserInFirestore(user);
 
-    // 🔹 Envia token inicial
+    // Envia token inicial
     sendAuthToIframe();
   }
 });
@@ -163,14 +164,6 @@ async function sendAuthToIframe() {
     console.warn('sendAuthToIframe error', e);
   }
 }
-
-// 🔹 Escuta confirmação de autenticação do iframe
-window.addEventListener('message', (event) => {
-  if (event.data?.type === 'authVerified') {
-    const loading = document.getElementById('iframeLoading');
-    if (loading && loading.parentNode) loading.parentNode.removeChild(loading);
-  }
-});
 
 // 🔹 Botão sair
 logoutBtn.addEventListener('click', async () => {

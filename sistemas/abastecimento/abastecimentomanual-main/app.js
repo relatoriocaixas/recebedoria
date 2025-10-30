@@ -1,4 +1,5 @@
 // app.js (adaptado para usar apenas o Firebase do portal)
+// importa do firebase.js (já configurado para o projeto unificado)
 import {
   auth, db, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, updatePassword,
   doc, setDoc, getDoc, updateDoc, addDoc, getDocs, collection, query, where, serverTimestamp, orderBy
@@ -7,18 +8,27 @@ import {
 // Helpers e utilitários
 const $ = (sel) => document.querySelector(sel);
 const fmtMoney = (v) => (Number(v || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-const todayISO = () => { const d = new Date(); return d.toLocaleDateString('pt-BR').split('/').reverse().join('-'); };
-function formatISOtoBR(isoDate) { if (!isoDate) return ""; const [y, m, d] = isoDate.split("-"); return `${d}/${m}/${y}`; }
+
+const todayISO = () => {
+  const d = new Date();
+  return d.toLocaleDateString('pt-BR').split('/').reverse().join('-');
+};
+
+function formatISOtoBR(isoDate) {
+  if (!isoDate) return "";
+  const [y, m, d] = isoDate.split("-");
+  return `${d}/${m}/${y}`;
+}
 
 const adminsMat = new Set(['4144','70029','6266']);
-const emailFromMat = (mat) => `${mat}@movebuss.com`;
+const emailFromMat = (mat) => `${mat}@movebuss.com`; // mantido conforme código anterior
 
 // State
 let currentUserDoc = null;
 let currentCaixaRef = null;
 
-// Elements
-const authArea = $('#authArea');
+// Elements (alguns podem ser nulos se o HTML não tiver a área de auth)
+const authArea = $('#authArea'); // provavelmente null agora — usamos checks antes de acessar
 const appArea = $('#appArea');
 const userBadge = $('#userBadge');
 const btnLogout = $('#btnLogout');
@@ -39,29 +49,41 @@ const prefixo = $('#prefixo');
 const dataCaixa = $('#dataCaixa');
 const matMotorista = $('#matMotorista');
 
-// Tela de carregamento
-const loadingScreen = document.getElementById('loadingScreen');
-
-// Segurança: placeholders
-if (!qtdBordos) console.warn('Elemento #qtdBordos não encontrado no DOM.');
-if (!dataCaixa) console.warn('Elemento #dataCaixa não encontrado no DOM.');
+// segurança: se algum elemento não existir, cria placeholders para não quebrar o código
+if (!qtdBordos) {
+  console.warn('Elemento #qtdBordos não encontrado no DOM — verificando HTML.');
+}
+if (!dataCaixa) {
+  console.warn('Elemento #dataCaixa não encontrado no DOM — verificando HTML.');
+}
 
 // Atualiza valor automaticamente
-const updateValor = () => { if (!qtdBordos || !valor) return; const q = Number(qtdBordos.value || 0); valor.value = (q * 5).toFixed(2); };
+const updateValor = () => {
+  if (!qtdBordos || !valor) return;
+  const q = Number(qtdBordos.value || 0);
+  valor.value = (q * 5).toFixed(2);
+};
 if (qtdBordos) qtdBordos.addEventListener('input', updateValor);
 
 // Prefixo: apenas dígitos e máximo 3
-if (prefixo) prefixo.addEventListener('input', () => { prefixo.value = prefixo.value.replace(/\D/g, '').slice(0,3); });
+if (prefixo) {
+  prefixo.addEventListener('input', () => {
+    prefixo.value = prefixo.value.replace(/\D/g, '').slice(0,3);
+  });
+}
 
 // Data default
 if (dataCaixa) dataCaixa.value = todayISO();
 
-// ---- Removed login/register listeners ----
-// Mantido apenas logout e change password
+// ---- Removed login/register listeners (we use portal auth) ----
+// NOTE: login/register code removed to avoid conflicts with portal auth
+
+// Keep logout and change password handlers (they operate on portal auth)
 if (btnLogout) {
   btnLogout.addEventListener('click', async () => {
     try {
       await signOut(auth);
+      // UI: hide app area — onAuthStateChanged will handle rest
       if (appArea) appArea.classList.add('hidden');
       if (userBadge) userBadge.classList.add('hidden');
     } catch (e) {
@@ -84,13 +106,10 @@ if (btnChangePass) {
   });
 }
 
-// onAuthStateChanged: integra com o portal
+// onAuthStateChanged: integra com o portal (sem redirecionamentos)
 onAuthStateChanged(auth, async (user) => {
-  // mostra tela de carregamento
-  if (loadingScreen) loadingScreen.style.display = 'flex';
-
   if (!user) {
-    // sem usuário
+    // Sem usuário logado: apenas mantém app escondido (não redireciona)
     if (authArea) authArea.classList.remove('hidden');
     if (appArea) appArea.classList.add('hidden');
     if (userBadge) userBadge.classList.add('hidden');
@@ -98,16 +117,16 @@ onAuthStateChanged(auth, async (user) => {
     if (btnChangePass) btnChangePass.classList.add('hidden');
     currentUserDoc = null;
     currentCaixaRef = null;
-
-    if (loadingScreen) loadingScreen.style.display = 'none';
     return;
   }
 
+  // Usuário autenticado no portal — carregar perfil do Firestore
   try {
     const uref = doc(db, 'users', user.uid);
     const snap = await getDoc(uref);
     currentUserDoc = snap.exists() ? snap.data() : null;
 
+    // Se o documento não existir, criar um baseline (preservando comportamento anterior)
     if (!currentUserDoc) {
       const matDefault = user.email ? user.email.split('@')[0] : 'unknown';
       const novo = { nome: matDefault, matricula: matDefault, admin: adminsMat.has(matDefault), createdAt: serverTimestamp() };
@@ -115,6 +134,7 @@ onAuthStateChanged(auth, async (user) => {
       currentUserDoc = novo;
     }
 
+    // ajuste admin automático (mantido)
     if (adminsMat.has(currentUserDoc?.matricula) && !currentUserDoc.admin) {
       await updateDoc(uref, { admin: true });
       currentUserDoc.admin = true;
@@ -125,23 +145,20 @@ onAuthStateChanged(auth, async (user) => {
     if (appArea) appArea.classList.remove('hidden');
     if (btnLogout) btnLogout.classList.remove('hidden');
     if (btnChangePass) btnChangePass.classList.remove('hidden');
+
     if (matRecebedor && currentUserDoc?.matricula) matRecebedor.value = currentUserDoc.matricula;
+
     if (userBadge) {
       userBadge.textContent = `${currentUserDoc.nome} • ${currentUserDoc.matricula}`;
       userBadge.classList.remove('hidden');
-      if (currentUserDoc.admin) userBadge.classList.add('admin');
-      else userBadge.classList.remove('admin');
+      if (currentUserDoc.admin) userBadge.classList.add('admin'); else userBadge.classList.remove('admin');
     }
 
-    // Continua fluxo de caixa
+    // Continuar com o fluxo de caixa existente
     await detectOrUpdateCaixaStatus();
-
-    // ✅ usuário validado: esconde loading
-    if (loadingScreen) loadingScreen.style.display = 'none';
   } catch (e) {
     console.error('Erro ao ler dados do usuário:', e);
     alert('Erro ao carregar perfil do usuário: ' + (e?.message || e));
-    if (loadingScreen) loadingScreen.style.display = 'none';
   }
 });
 
@@ -176,7 +193,6 @@ function enableWorkflows(aberto) {
   if (sangriaBox) sangriaBox.classList.toggle('hidden', !aberto);
 }
 
-// ---- Eventos de abertura/fechamento de caixa ----
 if (btnAbrir) {
   btnAbrir.addEventListener('click', async () => {
     if (!auth.currentUser) return alert('Usuário não autenticado. Faça login no portal.');
@@ -228,6 +244,7 @@ if (btnSalvarLanc) {
     await renderParcial();
     printThermalReceipt(dados);
 
+    // Limpa os campos no site após gerar recibo
     if (qtdBordos) qtdBordos.value = '';
     if (valor) valor.value = '';
     if (tipoVal) tipoVal.value = '';
@@ -236,7 +253,6 @@ if (btnSalvarLanc) {
   });
 }
 
-// ---- Sangrias ----
 const btnRegistrarSangria = $('#btnRegistrarSangria');
 if (btnRegistrarSangria) {
   btnRegistrarSangria.addEventListener('click', async () => {
@@ -253,7 +269,7 @@ if (btnRegistrarSangria) {
   });
 }
 
-// ---- Relatório parcial ----
+// ---- Relatório parcial com hora ----
 async function renderParcial() {
   if (!currentCaixaRef || !currentUserDoc) {
     if (relatorioLista) relatorioLista.textContent = 'Sem lançamentos. Abra um caixa para iniciar.';
@@ -314,7 +330,7 @@ function printThermalReceipt(data) {
   win.document.write(html); win.document.close();
 }
 
-// ---- PDF relatório completo ----
+// ---- PDF relatório completo com hora ----
 async function gerarRelatorioPDF() {
   const { jsPDF } = window.jspdf;
   const docpdf = new jsPDF({ unit: 'pt', format: 'a4' });
@@ -350,6 +366,7 @@ async function gerarRelatorioPDF() {
       if (aberturaTxt){ docpdf.text(`Abertura do caixa: ${aberturaTxt}`, 40, y); y+=16; }
       docpdf.text(`Data do fechamento: ${dataHoraBR}`, 40, y); y+=22;
 
+      // --- Lançamentos ---
       const lref = collection(db,'users',uid,'caixas',cid,'lancamentos');
       const lqs = await getDocs(query(lref, orderBy('createdAt','asc')));
       const lancamentosBody = []; let total=0;
@@ -371,6 +388,7 @@ async function gerarRelatorioPDF() {
       });
       y = docpdf.lastAutoTable.finalY + 20;
 
+      // --- Sangrias ---
       const sref = collection(db,'users',uid,'caixas',cid,'sangrias');
       const sqs = await getDocs(query(sref, orderBy('createdAt','asc')));
       const sangriasBody=[]; let totalS=0;
@@ -390,6 +408,7 @@ async function gerarRelatorioPDF() {
       docpdf.text(`Total Sangrias: ${fmtMoney(totalS)}`,40,y); y+=14;
       docpdf.text(`Total Corrigido: ${fmtMoney(total-totalS)}`,40,y); y+=22;
 
+      // --- Nome do PDF: matricula-data-hora.minuto ---
       const d = hoje;
       const nomeArquivo = `${currentUserDoc.matricula}-${d.toLocaleDateString('pt-BR').split('/').reverse().join('-')}-${d.getHours()}.${d.getMinutes()}.pdf`;
       docpdf.save(nomeArquivo);

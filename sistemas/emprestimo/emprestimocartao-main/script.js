@@ -1,7 +1,5 @@
 ﻿// Espera carregar o DOM
 document.addEventListener("DOMContentLoaded", () => {
-    const loading = document.getElementById("loadingScreen");
-
     const tipoCartao = document.getElementById("tipoCartao");
     const digiconField = document.getElementById("digiconField");
     const prodataField = document.getElementById("prodataField");
@@ -87,10 +85,4 @@ document.addEventListener("DOMContentLoaded", () => {
             alert("Erro ao salvar registro. Veja o console.");
         }
     });
-
-    // === Esconde a tela de carregamento ===
-    if (loading) {
-        // Pode adicionar efeito de fade out se quiser
-        loading.style.display = "none";
-    }
 });
