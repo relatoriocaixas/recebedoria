@@ -37,25 +37,6 @@ function openRoute(route) {
   iframeContainer.style.display = 'block';
   iframeContainer.classList.add('full');
   frame.src = src;
-  setTimeout(sendAuthToIframe, 500);
-}
-
-// Atalhos da barra lateral
-document.querySelectorAll('.sidebar li').forEach(li => {
-  li.addEventListener('click', () => {
-    const t = li.dataset.target;
-    if (t === 'home') goHome();
-    else openRoute(t);
-  });
-});
-
-// Atualiza o #dataVigente com a data atual
-if (dataVigenteSpan) {
-  const hoje = new Date();
-  const dia = String(hoje.getDate()).padStart(2, '0');
-  const mes = String(hoje.getMonth() + 1).padStart(2, '0');
-  const ano = hoje.getFullYear();
-  dataVigenteSpan.textContent = `${dia}/${mes}/${ano}`;
 }
 
 // 🔹 Garante que o usuário exista em "users"
@@ -79,7 +60,6 @@ async function ensureUserInFirestore(user) {
       });
       console.log("Usuário adicionado à coleção 'users'.");
     } else {
-      // Atualiza se o domínio mudar ou admin for diferente
       const existing = userSnap.data();
       if (existing.admin !== isAdmin) {
         await setDoc(userRef, { ...existing, admin: isAdmin }, { merge: true });
@@ -91,7 +71,16 @@ async function ensureUserInFirestore(user) {
   }
 }
 
-// Auth e badge
+// Atualiza o #dataVigente com a data atual
+if (dataVigenteSpan) {
+  const hoje = new Date();
+  const dia = String(hoje.getDate()).padStart(2, '0');
+  const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+  const ano = hoje.getFullYear();
+  dataVigenteSpan.textContent = `${dia}/${mes}/${ano}`;
+}
+
+// 🔹 Autenticação principal
 onAuthStateChanged(auth, async (user) => {
   if (!user) {
     window.location.href = 'login.html';
@@ -109,61 +98,20 @@ onAuthStateChanged(auth, async (user) => {
     });
 
     goHome();
-
-    // 🔹 Garante que o usuário esteja na coleção "users"
     await ensureUserInFirestore(user);
 
-    // Envia auth para iframe
-    try {
-      const idToken = await user.getIdToken();
-      const payload = {
-        type: 'syncAuth',
-        usuario: {
-          matricula: parts[0] || '',
-          email: user.email || '',
-          nome: user.displayName || ''
-        },
-        idToken
-      };
-      if (frame && frame.contentWindow) {
-        frame.contentWindow.postMessage(payload, '*');
-      }
-    } catch (e) {
-      console.warn('erro ao enviar token ao iframe', e);
-    }
+    // Envia token inicial
+    sendAuthToIframe();
+
+    // 🔹 Corrige problema de logout ao abrir iframes
+    frame.addEventListener('load', () => {
+      // Reenvia auth quando o iframe terminar de carregar
+      setTimeout(sendAuthToIframe, 400);
+    });
   }
 });
 
-// Botão sair
-logoutBtn.addEventListener('click', async () => {
-  await signOut(auth);
-  window.location.href = 'login.html';
-});
-
-// ✅ Botão alterar senha (corrigido)
-changePassBtn.addEventListener('click', async () => {
-  const user = auth.currentUser;
-  if (!user) return alert('Usuário não autenticado.');
-
-  const nova = prompt('Digite a nova senha:');
-  if (!nova) return;
-
-  try {
-    await updatePassword(user, nova);
-    alert('Senha alterada com sucesso.');
-  } catch (e) {
-    console.error('Erro ao alterar senha:', e);
-    if (e.code === 'auth/requires-recent-login') {
-      alert('Por segurança, faça login novamente antes de alterar a senha.');
-      await signOut(auth);
-      window.location.href = 'login.html';
-    } else {
-      alert('Erro ao alterar senha: ' + (e?.message || e));
-    }
-  }
-});
-
-// Função original de enviar auth para iframe
+// 🔹 Envio seguro do auth
 async function sendAuthToIframe() {
   try {
     const user = auth.currentUser;
@@ -186,3 +134,32 @@ async function sendAuthToIframe() {
     console.warn('sendAuthToIframe error', e);
   }
 }
+
+// 🔹 Botão sair
+logoutBtn.addEventListener('click', async () => {
+  await signOut(auth);
+  window.location.href = 'login.html';
+});
+
+// 🔹 Botão alterar senha (mantém a lógica original)
+changePassBtn.addEventListener('click', async () => {
+  const user = auth.currentUser;
+  if (!user) return alert('Usuário não autenticado.');
+
+  const nova = prompt('Digite a nova senha:');
+  if (!nova) return;
+
+  try {
+    await updatePassword(user, nova);
+    alert('Senha alterada com sucesso.');
+  } catch (e) {
+    console.error('Erro ao alterar senha:', e);
+    if (e.code === 'auth/requires-recent-login') {
+      alert('Por segurança, faça login novamente antes de alterar a senha.');
+      await signOut(auth);
+      window.location.href = 'login.html';
+    } else {
+      alert('Erro ao alterar senha: ' + (e?.message || e));
+    }
+  }
+});
