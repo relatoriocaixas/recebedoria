@@ -32,44 +32,77 @@ loadingOverlay.innerHTML = `
 `;
 document.body.appendChild(loadingOverlay);
 
-function showLoading() { loadingOverlay.style.display = 'flex'; }
-function hideLoading() { loadingOverlay.style.display = 'none'; }
+function showLoading() {
+  loadingOverlay.style.display = 'flex';
+}
+function hideLoading() {
+  loadingOverlay.style.display = 'none';
+}
 
-// 🔹 Função para ir à tela inicial
+// 🔹 Volta para tela inicial (avisos)
 function goHome() {
   showLoading();
-  setTimeout(() => {
-    iframeContainer.classList.remove('full');
-    iframeContainer.style.display = 'none';
-    avisosSection.style.display = 'block';
-    sidebar.style.display = 'flex';
-    hideLoading();
-  }, 6000); // 10 segundos de carregamento
+  iframeContainer.style.display = 'none';
+  avisosSection.style.display = 'block';
+  sidebar.style.display = 'flex';
+  setTimeout(() => hideLoading(), 800); // transição rápida e suave
 }
 
-// 🔹 Função para abrir uma rota no iframe
-function openRoute(route) {
+// 🔹 Função robusta para abrir um módulo
+async function openRoute(route) {
   const src = ROUTES[route];
-  if (!src) {
-    goHome();
-    return;
-  }
+  if (!src) return goHome();
 
   showLoading();
-  avisosSection.style.display = 'none';
-  iframeContainer.style.display = 'block';
-  iframeContainer.classList.add('full');
 
-  frame.onload = null;
-  frame.onload = async () => {
-    await sendAuthToIframe();
-    setTimeout(() => hideLoading(), 10000); // 10 segundos de carregamento
-  };
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      alert("Sessão expirada. Faça login novamente.");
+      return (window.location.href = "login.html");
+    }
 
-  frame.src = src;
+    // 🔸 Aguarda token válido ANTES de carregar o iframe
+    const idToken = await user.getIdToken(true);
+
+    // 🔸 Esconde os avisos e mostra área do iframe
+    avisosSection.style.display = 'none';
+    iframeContainer.style.display = 'block';
+    iframeContainer.classList.add('full');
+    frame.style.display = 'none'; // oculta até terminar tudo
+
+    // 🔸 Carrega o iframe somente agora
+    frame.src = src;
+
+    await new Promise((resolve) => {
+      frame.onload = () => resolve();
+    });
+
+    // 🔸 Envia o token e dados de usuário ao iframe
+    const parts = (user.email || '').split('@');
+    const payload = {
+      type: "syncAuth",
+      usuario: {
+        matricula: parts[0] || '',
+        email: user.email || '',
+        nome: user.displayName || ''
+      },
+      idToken
+    };
+    frame.contentWindow.postMessage(payload, "*");
+
+    // 🔸 Após envio bem-sucedido, mostra o conteúdo
+    frame.style.display = 'block';
+    hideLoading();
+
+  } catch (error) {
+    console.error("Erro ao abrir módulo:", error);
+    alert("Erro ao carregar o sistema. Tente novamente.");
+    hideLoading();
+  }
 }
 
-// 🔹 Atalhos da barra lateral
+// 🔹 Itens da barra lateral
 document.querySelectorAll('.sidebar li').forEach(li => {
   li.addEventListener('click', () => {
     const t = li.dataset.target;
@@ -78,7 +111,7 @@ document.querySelectorAll('.sidebar li').forEach(li => {
   });
 });
 
-// 🔹 Atualiza o #dataVigente com a data atual
+// 🔹 Atualiza a data vigente
 if (dataVigenteSpan) {
   const hoje = new Date();
   const dia = String(hoje.getDate()).padStart(2, '0');
@@ -95,7 +128,7 @@ async function ensureUserInFirestore(user) {
     const parts = (user.email || '').split('@');
     const matricula = parts[0] || '';
     const domain = parts[1] || '';
-    const isAdmin = domain.toLowerCase() === 'movebuss.local'; // 🔹 admin automático
+    const isAdmin = domain.toLowerCase() === 'movebuss.local';
 
     if (!userSnap.exists()) {
       await setDoc(userRef, {
@@ -119,7 +152,7 @@ async function ensureUserInFirestore(user) {
   }
 }
 
-// 🔹 Autenticação principal
+// 🔹 Estado de autenticação principal
 onAuthStateChanged(auth, async (user) => {
   showLoading();
   if (!user) {
@@ -139,40 +172,13 @@ onAuthStateChanged(auth, async (user) => {
 
     await ensureUserInFirestore(user);
 
-    // envia token inicial
-    sendAuthToIframe();
-
-    // Mantém o overlay 10 segundos ao carregar
+    // 🔸 Após login, abre Home com transição leve
     setTimeout(() => {
       goHome();
       hideLoading();
-    }, 10000);
+    }, 800);
   }
 });
-
-// 🔹 Envio seguro do auth
-async function sendAuthToIframe() {
-  try {
-    const user = auth.currentUser;
-    if (!user) return;
-    const parts = (user.email || '').split('@');
-    const idToken = await user.getIdToken();
-    const payload = {
-      type: 'syncAuth',
-      usuario: {
-        matricula: parts[0] || '',
-        email: user.email || '',
-        nome: user.displayName || ''
-      },
-      idToken
-    };
-    if (frame && frame.contentWindow) {
-      frame.contentWindow.postMessage(payload, '*');
-    }
-  } catch (e) {
-    console.warn('sendAuthToIframe error', e);
-  }
-}
 
 // 🔹 Botão sair
 logoutBtn.addEventListener('click', async () => {
