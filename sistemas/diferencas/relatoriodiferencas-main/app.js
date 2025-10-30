@@ -1,6 +1,6 @@
 // app.js
 import { 
-  auth, db, onAuthStateChanged, collection, getDocs, query, where, orderBy, addDoc, doc, getDoc, updateDoc, deleteDoc, serverTimestamp
+  auth, db, onAuthStateChanged, collection, getDocs, query, where, orderBy, addDoc, doc, getDoc, updateDoc, serverTimestamp 
 } from "./firebaseConfig.js";
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -22,12 +22,13 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   onAuthStateChanged(auth, async (user) => {
+    const loading = document.getElementById("loadingScreen");
     if (!user) {
       window.location.href = "/login.html";
       return;
     }
 
-    console.log("[app] onAuthStateChanged fired — user:", user.uid);
+    console.log("[app] onAuthStateChanged — user:", user.uid);
 
     const userRef = doc(db, "users", user.uid);
     const userSnap = await getDoc(userRef);
@@ -41,11 +42,19 @@ document.addEventListener("DOMContentLoaded", () => {
     const IS_ADMIN = userData.admin === true;
     const MATRICULA = userData.matricula;
 
+    // Configura interface
     configurarInterface(IS_ADMIN);
+
+    // Carrega selects e eventos
     await popularSelects(IS_ADMIN);
     inicializarEventos(IS_ADMIN, MATRICULA);
-    carregarRelatorios(IS_ADMIN, MATRICULA);
-    carregarResumoMensal(IS_ADMIN);
+
+    // Carrega relatórios e resumo
+    await carregarRelatorios(IS_ADMIN, MATRICULA);
+    await carregarResumoMensal(IS_ADMIN);
+
+    // ESCONDE a tela de loading
+    if (loading) loading.style.display = "none";
   });
 });
 
@@ -58,12 +67,12 @@ function configurarInterface(admin) {
 }
 
 // ===========================
-// Popula selects de matrícula (corrigido)
+// Popula selects de matrícula
 // ===========================
 async function popularSelects(admin) {
   const selectForm = document.getElementById("matriculaForm");
   const selectResumo = document.getElementById("selectMatriculas");
-  const filtroMatricula = document.getElementById("filtroMatricula"); // correção
+  const filtroMatricula = document.getElementById("filtroMatricula");
 
   const snapshot = await getDocs(collection(db, "users"));
   const matriculas = [];
@@ -90,7 +99,7 @@ async function popularSelects(admin) {
 }
 
 // ===========================
-// Eventos
+// Inicializa eventos
 // ===========================
 function inicializarEventos(admin, matricula) {
   const btnSalvarRelatorio = document.getElementById("btnSalvarRelatorio");
@@ -104,7 +113,6 @@ function inicializarEventos(admin, matricula) {
   if (btnToggleResumo) btnToggleResumo.addEventListener("click", () => document.getElementById("resumoWrap").classList.toggle("collapsed"));
   if (btnLogout) btnLogout.addEventListener("click", () => auth.signOut().then(() => window.location.href = "/login.html"));
 
-  // Filtro "Ver apenas" restaurado
   if (filtroResumo) {
     filtroResumo.addEventListener("change", () => carregarResumoMensal(admin));
   }
@@ -141,7 +149,7 @@ async function salvarRelatorio(admin) {
       valorFolha
     });
     alert("Relatório salvo!");
-    carregarRelatorios(true, matricula);
+    await carregarRelatorios(true, matricula);
   } catch (e) {
     console.error("Erro ao salvar relatório:", e);
     alert("Erro ao salvar relatório.");
@@ -153,6 +161,7 @@ async function salvarRelatorio(admin) {
 // ===========================
 async function carregarRelatorios(admin, userMatricula) {
   const lista = document.getElementById("listaRelatorios");
+  if (!lista) return;
   lista.innerHTML = "";
 
   try {
@@ -172,9 +181,11 @@ async function carregarRelatorios(admin, userMatricula) {
 
       const diferencaClass = r.sobraFalta >= 0 ? "positivo" : "negativo";
 
+      const dataStr = r.dataCaixa?.toDate ? r.dataCaixa.toDate().toLocaleDateString() : new Date(r.dataCaixa).toLocaleDateString();
+
       tr.innerHTML = `
         <div class="item-header">
-          <strong>${r.dataCaixa instanceof Object && r.dataCaixa.toDate ? r.dataCaixa.toDate().toLocaleDateString() : new Date(r.dataCaixa).toLocaleDateString()}</strong> — Matrícula: ${r.matricula}
+          <strong>${dataStr}</strong> — Matrícula: ${r.matricula}
           <button class="btn outline btnToggle" data-id="${docSnap.id}">Ocultar/Exibir</button>
         </div>
         <div class="item-body hidden">
@@ -196,8 +207,8 @@ async function carregarRelatorios(admin, userMatricula) {
 
     document.querySelectorAll(".btnToggle").forEach(btn => {
       btn.addEventListener("click", () => {
-        const body = btn.closest(".relatorio-item").querySelector(".item-body");
-        body.classList.toggle("hidden");
+        const body = btn.closest(".relatorio-item")?.querySelector(".item-body");
+        if (body) body.classList.toggle("hidden");
       });
     });
 
@@ -220,10 +231,12 @@ async function carregarRelatorios(admin, userMatricula) {
 async function abrirPosConferencia(id, admin) {
   const modal = document.getElementById("posModal");
   const textarea = document.getElementById("posTexto");
-  modal.showModal();
+  if (!modal || !textarea) return;
 
+  modal.showModal();
   const docRef = doc(db, "relatorios", id);
   const docSnap = await getDoc(docRef);
+
   if (docSnap.exists()) {
     textarea.value = docSnap.data().posTexto || "";
     textarea.disabled = !admin;
@@ -231,13 +244,10 @@ async function abrirPosConferencia(id, admin) {
 
   document.getElementById("btnSalvarPos").onclick = async () => {
     if (!admin) return;
-    await updateDoc(docRef, {
-      posTexto: textarea.value,
-      posEditado: true
-    });
+    await updateDoc(docRef, { posTexto: textarea.value, posEditado: true });
     alert("Pós Conferência salva!");
     modal.close();
-    carregarRelatorios(true, "");
+    await carregarRelatorios(true, "");
   };
 }
 
@@ -263,7 +273,7 @@ async function editarRelatorio(id) {
   });
 
   alert("Relatório atualizado!");
-  carregarRelatorios(true, "");
+  await carregarRelatorios(true, "");
 }
 
 // ===========================
@@ -273,7 +283,7 @@ async function carregarResumoMensal(admin) {
   if (!admin) return;
 
   const select = document.getElementById("selectMatriculas");
-  const matricula = select.value;
+  const matricula = select?.value;
   if (!matricula) return;
 
   const mesInput = document.getElementById("mesResumo");
@@ -298,7 +308,7 @@ async function carregarResumoMensal(admin) {
 
     snapshot.forEach(docSnap => {
       const r = docSnap.data();
-      const dt = r.dataCaixa.toDate ? r.dataCaixa.toDate() : new Date(r.dataCaixa);
+      const dt = r.dataCaixa?.toDate ? r.dataCaixa.toDate() : new Date(r.dataCaixa);
       if (dt >= start && dt <= end) {
         const vf = Number(r.valorFolha || 0);
         const vd = Number(r.valorDinheiro || 0);
@@ -314,10 +324,12 @@ async function carregarResumoMensal(admin) {
     document.getElementById("resumoSituacao").textContent = saldo >= 0 ? "Positivo" : "Negativo";
 
     const lista = document.getElementById("resumoLista");
-    lista.innerHTML = `
-      <details><summary>Dias com sobra</summary>${detalhesPos.join("<br>") || "-"}</details>
-      <details><summary>Dias com falta</summary>${detalhesNeg.join("<br>") || "-"}</details>
-    `;
+    if (lista) {
+      lista.innerHTML = `
+        <details><summary>Dias com sobra</summary>${detalhesPos.join("<br>") || "-"}</details>
+        <details><summary>Dias com falta</summary>${detalhesNeg.join("<br>") || "-"}</details>
+      `;
+    }
 
   } catch (e) {
     console.error("Erro ao carregar resumo:", e);
