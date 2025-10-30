@@ -6,9 +6,6 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
-// ===========================
-// Elementos do DOM
-// ===========================
 const sidebar = document.getElementById('sidebar');
 const logoutBtn = document.getElementById('logoutBtn');
 const changePassBtn = document.getElementById('changePassBtn');
@@ -18,9 +15,6 @@ const iframeContainer = document.getElementById('iframeContainer');
 const avisosSection = document.getElementById('avisosSection');
 const dataVigenteSpan = document.getElementById('dataVigente');
 
-// ===========================
-// Rotas do portal
-// ===========================
 const ROUTES = {
   home: null,
   abastecimento: "sistemas/abastecimento/index.html",
@@ -29,9 +23,7 @@ const ROUTES = {
   diferencas: "sistemas/diferencas/index.html"
 };
 
-// ===========================
-// Tela de carregamento
-// ===========================
+// 🔹 Tela de carregamento
 const loadingOverlay = document.createElement('div');
 loadingOverlay.id = 'loadingOverlay';
 loadingOverlay.innerHTML = `
@@ -43,9 +35,7 @@ document.body.appendChild(loadingOverlay);
 function showLoading() { loadingOverlay.style.display = 'flex'; }
 function hideLoading() { loadingOverlay.style.display = 'none'; }
 
-// ===========================
-// Funções de interface
-// ===========================
+// 🔹 Função para ir à tela inicial
 function goHome() {
   iframeContainer.classList.remove('full');
   iframeContainer.style.display = 'none';
@@ -53,6 +43,7 @@ function goHome() {
   sidebar.style.display = 'flex';
 }
 
+// 🔹 Função para abrir uma rota no iframe
 function openRoute(route) {
   const src = ROUTES[route];
   if (!src) {
@@ -65,20 +56,26 @@ function openRoute(route) {
   iframeContainer.style.display = 'block';
   iframeContainer.classList.add('full');
 
-  // Remove listeners antigos
+  // Remove listeners antigos para não duplicar
   frame.onload = null;
   frame.onload = async () => {
-    // Envia auth assim que o iframe carrega
-    await broadcastAuthToIframe(frame);
+    await sendAuthToIframe();
     hideLoading();
   };
 
   frame.src = src;
 }
 
-// ===========================
-// Atualiza data atual
-// ===========================
+// 🔹 Atalhos da barra lateral
+document.querySelectorAll('.sidebar li').forEach(li => {
+  li.addEventListener('click', () => {
+    const t = li.dataset.target;
+    if (t === 'home') goHome();
+    else openRoute(t);
+  });
+});
+
+// 🔹 Atualiza o #dataVigente com a data atual
 if (dataVigenteSpan) {
   const hoje = new Date();
   const dia = String(hoje.getDate()).padStart(2, '0');
@@ -87,9 +84,7 @@ if (dataVigenteSpan) {
   dataVigenteSpan.textContent = `${dia}/${mes}/${ano}`;
 }
 
-// ===========================
-// Garante que o usuário exista no Firestore
-// ===========================
+// 🔹 Garante que o usuário exista em "users"
 async function ensureUserInFirestore(user) {
   try {
     const userRef = doc(db, "users", user.uid);
@@ -97,7 +92,7 @@ async function ensureUserInFirestore(user) {
     const parts = (user.email || '').split('@');
     const matricula = parts[0] || '';
     const domain = parts[1] || '';
-    const isAdmin = domain.toLowerCase() === 'movebuss.local';
+    const isAdmin = domain.toLowerCase() === 'movebuss.local'; // 🔹 admin automático
 
     if (!userSnap.exists()) {
       await setDoc(userRef, {
@@ -121,47 +116,11 @@ async function ensureUserInFirestore(user) {
   }
 }
 
-// ===========================
-// Envia auth para todos os iframes
-// ===========================
-async function broadcastAuthToIframe(targetFrame = null) {
-  const user = auth.currentUser;
-  if (!user) return;
-
-  const idToken = await user.getIdToken(true);
-  const payload = {
-    type: 'syncAuth',
-    usuario: {
-      email: user.email || '',
-      nome: user.displayName || '',
-      matricula: (user.email || '').split('@')[0]
-    },
-    idToken
-  };
-
-  // Se targetFrame fornecido, envia apenas para ele
-  if (targetFrame && targetFrame.contentWindow) {
-    targetFrame.contentWindow.postMessage(payload, '*');
-    return;
-  }
-
-  // Senão, envia para todos os iframes existentes
-  document.querySelectorAll('iframe').forEach(f => {
-    if (f.contentWindow) f.contentWindow.postMessage(payload, '*');
-  });
-}
-
-// ===========================
-// Autenticação principal
-// ===========================
+// 🔹 Autenticação principal
 onAuthStateChanged(auth, async (user) => {
-  showLoading();
   if (!user) {
     window.location.href = 'login.html';
-    return;
-  }
-
-  try {
+  } else {
     sidebar.classList.remove('hidden');
 
     const parts = (user.email || '').split('@');
@@ -174,41 +133,45 @@ onAuthStateChanged(auth, async (user) => {
       sidebarBadge.textContent = parts[0];
     });
 
+    goHome();
     await ensureUserInFirestore(user);
 
-    // envia auth para todos os iframes existentes
-    await broadcastAuthToIframe();
-
-    goHome();
-  } catch (err) {
-    console.error("Erro no carregamento inicial:", err);
-  } finally {
-    hideLoading();
+    // Envia token inicial
+    sendAuthToIframe();
   }
 });
 
-// ===========================
-// Atalhos da barra lateral
-// ===========================
-document.querySelectorAll('.sidebar li').forEach(li => {
-  li.addEventListener('click', () => {
-    const t = li.dataset.target;
-    if (t === 'home') goHome();
-    else openRoute(t);
-  });
-});
+// 🔹 Envio seguro do auth
+async function sendAuthToIframe() {
+  try {
+    const user = auth.currentUser;
+    if (!user) return;
+    const parts = (user.email || '').split('@');
+    const idToken = await user.getIdToken();
+    const payload = {
+      type: 'syncAuth',
+      usuario: {
+        matricula: parts[0] || '',
+        email: user.email || '',
+        nome: user.displayName || ''
+      },
+      idToken
+    };
+    if (frame && frame.contentWindow) {
+      frame.contentWindow.postMessage(payload, '*');
+    }
+  } catch (e) {
+    console.warn('sendAuthToIframe error', e);
+  }
+}
 
-// ===========================
-// Botão sair
-// ===========================
+// 🔹 Botão sair
 logoutBtn.addEventListener('click', async () => {
   await signOut(auth);
   window.location.href = 'login.html';
 });
 
-// ===========================
-// Botão alterar senha
-// ===========================
+// 🔹 Botão alterar senha (mantém a lógica original)
 changePassBtn.addEventListener('click', async () => {
   const user = auth.currentUser;
   if (!user) return alert('Usuário não autenticado.');
@@ -229,11 +192,4 @@ changePassBtn.addEventListener('click', async () => {
       alert('Erro ao alterar senha: ' + (e?.message || e));
     }
   }
-});
-
-// ===========================
-// Listener global para iframes
-// ===========================
-window.addEventListener('message', (e) => {
-  // aqui você pode tratar mensagens de retorno dos iframes se necessário
 });
