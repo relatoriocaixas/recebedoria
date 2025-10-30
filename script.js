@@ -1,6 +1,7 @@
 import { auth, db } from "./firebaseConfig.js";
 import {
   onAuthStateChanged,
+  onIdTokenChanged,
   signOut,
   updatePassword
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
@@ -62,9 +63,8 @@ function openRoute(route) {
 
   frame.onload = null;
   frame.onload = async () => {
-    // Aguarda envio de auth antes de liberar
     await sendAuthToIframe();
-    await new Promise(res => setTimeout(res, 1200)); // 🔹 delay aumentado
+    await new Promise(res => setTimeout(res, 1000));
     hideLoading();
   };
 
@@ -123,7 +123,7 @@ async function ensureUserInFirestore(user) {
 
 // 🔹 Autenticação principal
 onAuthStateChanged(auth, async (user) => {
-  showLoading(); // 🔹 mantém o overlay sempre até final da validação
+  showLoading();
 
   if (!user) {
     window.location.href = 'login.html';
@@ -131,11 +131,9 @@ onAuthStateChanged(auth, async (user) => {
   }
 
   try {
-    // 🔹 Aumenta o tempo total de sincronização
     await new Promise(res => setTimeout(res, 2500));
 
     sidebar.classList.remove('hidden');
-
     const parts = (user.email || '').split('@');
     sidebarBadge.textContent = parts[0];
 
@@ -148,15 +146,28 @@ onAuthStateChanged(auth, async (user) => {
 
     await ensureUserInFirestore(user);
 
-    // 🔹 Envia token e aguarda confirmação adicional
     await sendAuthToIframe();
-    await new Promise(res => setTimeout(res, 1500)); // 🔹 delay adicional antes de mostrar a tela
+    await new Promise(res => setTimeout(res, 1500));
 
     goHome();
   } catch (err) {
     console.error("Erro no carregamento inicial:", err);
   } finally {
     hideLoading();
+  }
+});
+
+// 🔹 Reautenticação automática — evita logout indesejado
+onIdTokenChanged(auth, async (user) => {
+  if (!user) return; // ignora se não houver usuário logado
+
+  try {
+    // força atualização do token a cada vez que ele muda
+    await user.getIdToken(true);
+    await sendAuthToIframe();
+    console.log("Token de autenticação atualizado automaticamente.");
+  } catch (e) {
+    console.warn("Falha ao atualizar token:", e);
   }
 });
 
