@@ -44,7 +44,7 @@ function goHome() {
     avisosSection.style.display = 'block';
     sidebar.style.display = 'flex';
     hideLoading();
-  }, 10000); // 10 segundos de carregamento
+  }, 6000); // 10 segundos de carregamento
 }
 
 // 🔹 Função para abrir uma rota no iframe
