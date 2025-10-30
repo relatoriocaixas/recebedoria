@@ -1,5 +1,5 @@
 // firebaseConfig.js
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
 import {
   getAuth,
   setPersistence,
@@ -9,9 +9,7 @@ import {
   signInWithEmailAndPassword,
   signOut,
   updatePassword
-} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
-
-// 🔹 Aqui vem a parte do Firestore:
+} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import {
   getFirestore,
   doc,
@@ -24,11 +22,9 @@ import {
   query,
   where,
   serverTimestamp,
-  orderBy
-} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
-
-// 🔹 `deleteDoc` deve ser importado separado (de firestore/lite)
-import { deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-lite.js";
+  orderBy,
+  deleteDoc
+} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
 // ======================================================
 // Configuração Firebase
@@ -71,5 +67,5 @@ export {
   where,
   serverTimestamp,
   orderBy,
-  deleteDoc // ✅ agora realmente existe
+  deleteDoc
 };
