@@ -23,6 +23,18 @@ const ROUTES = {
   diferencas: "sistemas/diferencas/index.html"
 };
 
+// 🔹 Tela de carregamento
+const loadingOverlay = document.createElement('div');
+loadingOverlay.id = 'loadingOverlay';
+loadingOverlay.innerHTML = `
+  <div class="spinner"></div>
+  <div>Carregando...</div>
+`;
+document.body.appendChild(loadingOverlay);
+
+function showLoading() { loadingOverlay.style.display = 'flex'; }
+function hideLoading() { loadingOverlay.style.display = 'none'; }
+
 // 🔹 Função para ir à tela inicial
 function goHome() {
   iframeContainer.classList.remove('full');
@@ -38,18 +50,23 @@ function openRoute(route) {
     goHome();
     return;
   }
+
+  showLoading();
   avisosSection.style.display = 'none';
   iframeContainer.style.display = 'block';
   iframeContainer.classList.add('full');
-  frame.src = src;
 
-  // Reenvia autenticação quando o iframe terminar de carregar
-  frame.addEventListener('load', () => {
-    setTimeout(sendAuthToIframe, 400);
-  });
+  // Remove listeners antigos para não duplicar
+  frame.onload = null;
+  frame.onload = async () => {
+    await sendAuthToIframe();
+    hideLoading();
+  };
+
+  frame.src = src;
 }
 
-// 🔹 Atalhos da barra lateral (corrigido)
+// 🔹 Atalhos da barra lateral
 document.querySelectorAll('.sidebar li').forEach(li => {
   li.addEventListener('click', () => {
     const t = li.dataset.target;
