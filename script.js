@@ -1,12 +1,14 @@
 import { auth, db } from "./firebaseConfig.js";
 import {
   onAuthStateChanged,
-  onIdTokenChanged,
   signOut,
   updatePassword
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
+// ===========================
+// Elementos do DOM
+// ===========================
 const sidebar = document.getElementById('sidebar');
 const logoutBtn = document.getElementById('logoutBtn');
 const changePassBtn = document.getElementById('changePassBtn');
@@ -16,6 +18,9 @@ const iframeContainer = document.getElementById('iframeContainer');
 const avisosSection = document.getElementById('avisosSection');
 const dataVigenteSpan = document.getElementById('dataVigente');
 
+// ===========================
+// Rotas do portal
+// ===========================
 const ROUTES = {
   home: null,
   abastecimento: "sistemas/abastecimento/index.html",
@@ -24,7 +29,9 @@ const ROUTES = {
   diferencas: "sistemas/diferencas/index.html"
 };
 
-// 🔹 Tela de carregamento
+// ===========================
+// Tela de carregamento
+// ===========================
 const loadingOverlay = document.createElement('div');
 loadingOverlay.id = 'loadingOverlay';
 loadingOverlay.innerHTML = `
@@ -33,14 +40,12 @@ loadingOverlay.innerHTML = `
 `;
 document.body.appendChild(loadingOverlay);
 
-function showLoading() {
-  loadingOverlay.style.display = 'flex';
-}
-function hideLoading() {
-  loadingOverlay.style.display = 'none';
-}
+function showLoading() { loadingOverlay.style.display = 'flex'; }
+function hideLoading() { loadingOverlay.style.display = 'none'; }
 
-// 🔹 Função para ir à tela inicial
+// ===========================
+// Funções de interface
+// ===========================
 function goHome() {
   iframeContainer.classList.remove('full');
   iframeContainer.style.display = 'none';
@@ -48,34 +53,32 @@ function goHome() {
   sidebar.style.display = 'flex';
 }
 
-// 🔹 Abre rota mantendo o iframe original
-async function openRoute(routeKey) {
-  const src = ROUTES[routeKey];
-  if (!src) return goHome();
+function openRoute(route) {
+  const src = ROUTES[route];
+  if (!src) {
+    goHome();
+    return;
+  }
 
   showLoading();
   avisosSection.style.display = 'none';
   iframeContainer.style.display = 'block';
   iframeContainer.classList.add('full');
 
+  // Remove listeners antigos
+  frame.onload = null;
   frame.onload = async () => {
-    await sendAuthToMainFrame();
-    setTimeout(() => hideLoading(), 200); // delay curto para garantir render
+    // Envia auth assim que o iframe carrega
+    await broadcastAuthToIframe(frame);
+    hideLoading();
   };
 
   frame.src = src;
 }
 
-// 🔹 Atalhos da barra lateral
-document.querySelectorAll('.sidebar li').forEach(li => {
-  li.addEventListener('click', () => {
-    const t = li.dataset.target;
-    if (t === 'home') goHome();
-    else openRoute(t);
-  });
-});
-
-// 🔹 Atualiza o #dataVigente com a data atual
+// ===========================
+// Atualiza data atual
+// ===========================
 if (dataVigenteSpan) {
   const hoje = new Date();
   const dia = String(hoje.getDate()).padStart(2, '0');
@@ -84,7 +87,9 @@ if (dataVigenteSpan) {
   dataVigenteSpan.textContent = `${dia}/${mes}/${ano}`;
 }
 
-// 🔹 Garante que o usuário exista em "users"
+// ===========================
+// Garante que o usuário exista no Firestore
+// ===========================
 async function ensureUserInFirestore(user) {
   try {
     const userRef = doc(db, "users", user.uid);
@@ -116,38 +121,49 @@ async function ensureUserInFirestore(user) {
   }
 }
 
-// 🔹 Envio do token para o iframe existente
-async function sendAuthToMainFrame() {
+// ===========================
+// Envia auth para todos os iframes
+// ===========================
+async function broadcastAuthToIframe(targetFrame = null) {
   const user = auth.currentUser;
   if (!user) return;
-  const parts = (user.email || '').split('@');
+
   const idToken = await user.getIdToken(true);
   const payload = {
     type: 'syncAuth',
     usuario: {
-      matricula: parts[0] || '',
       email: user.email || '',
-      nome: user.displayName || ''
+      nome: user.displayName || '',
+      matricula: (user.email || '').split('@')[0]
     },
     idToken
   };
-  if (frame && frame.contentWindow) frame.contentWindow.postMessage(payload, '*');
+
+  // Se targetFrame fornecido, envia apenas para ele
+  if (targetFrame && targetFrame.contentWindow) {
+    targetFrame.contentWindow.postMessage(payload, '*');
+    return;
+  }
+
+  // Senão, envia para todos os iframes existentes
+  document.querySelectorAll('iframe').forEach(f => {
+    if (f.contentWindow) f.contentWindow.postMessage(payload, '*');
+  });
 }
 
-// 🔹 Autenticação principal
+// ===========================
+// Autenticação principal
+// ===========================
 onAuthStateChanged(auth, async (user) => {
   showLoading();
-
   if (!user) {
     window.location.href = 'login.html';
     return;
   }
 
   try {
-    // 🔹 Delay curto para garantir carregamento do Firebase
-    await new Promise(res => setTimeout(res, 1500));
-
     sidebar.classList.remove('hidden');
+
     const parts = (user.email || '').split('@');
     sidebarBadge.textContent = parts[0];
 
@@ -160,7 +176,8 @@ onAuthStateChanged(auth, async (user) => {
 
     await ensureUserInFirestore(user);
 
-    await sendAuthToMainFrame();
+    // envia auth para todos os iframes existentes
+    await broadcastAuthToIframe();
 
     goHome();
   } catch (err) {
@@ -170,26 +187,28 @@ onAuthStateChanged(auth, async (user) => {
   }
 });
 
-// 🔹 Reautenticação automática — evita logout indesejado
-onIdTokenChanged(auth, async (user) => {
-  if (!user) return; // ignora se não houver usuário logado
-
-  try {
-    await user.getIdToken(true); // força atualização do token
-    await sendAuthToMainFrame();
-    console.log("Token de autenticação atualizado automaticamente.");
-  } catch (e) {
-    console.warn("Falha ao atualizar token:", e);
-  }
+// ===========================
+// Atalhos da barra lateral
+// ===========================
+document.querySelectorAll('.sidebar li').forEach(li => {
+  li.addEventListener('click', () => {
+    const t = li.dataset.target;
+    if (t === 'home') goHome();
+    else openRoute(t);
+  });
 });
 
-// 🔹 Botão sair
+// ===========================
+// Botão sair
+// ===========================
 logoutBtn.addEventListener('click', async () => {
   await signOut(auth);
   window.location.href = 'login.html';
 });
 
-// 🔹 Botão alterar senha
+// ===========================
+// Botão alterar senha
+// ===========================
 changePassBtn.addEventListener('click', async () => {
   const user = auth.currentUser;
   if (!user) return alert('Usuário não autenticado.');
@@ -210,4 +229,11 @@ changePassBtn.addEventListener('click', async () => {
       alert('Erro ao alterar senha: ' + (e?.message || e));
     }
   }
+});
+
+// ===========================
+// Listener global para iframes
+// ===========================
+window.addEventListener('message', (e) => {
+  // aqui você pode tratar mensagens de retorno dos iframes se necessário
 });
