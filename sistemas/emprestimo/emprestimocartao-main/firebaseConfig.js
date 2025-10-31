@@ -1,71 +1,24 @@
-// firebaseConfig.js
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
-import {
-  getAuth,
-  setPersistence,
-  browserLocalPersistence,
-  onAuthStateChanged,
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signOut,
-  updatePassword
-} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
-import {
-  getFirestore,
-  doc,
-  setDoc,
-  getDoc,
-  updateDoc,
-  addDoc,
-  getDocs,
-  collection,
-  query,
-  where,
-  serverTimestamp,
-  orderBy,
-  deleteDoc
-} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
-
-// ======================================================
-// Configuração Firebase
-// ======================================================
-export const firebaseConfig = {
-  apiKey: "AIzaSyBWmq02P8pGbl2NmppEAIKtF9KtQ7AzTFQ",
-  authDomain: "unificado-441cd.firebaseapp.com",
-  projectId: "unificado-441cd",
-  storageBucket: "unificado-441cd.firebasestorage.app",
-  messagingSenderId: "671392063569",
-  appId: "1:671392063569:web:57e3f6b54fcdc45862d870",
-  measurementId: "G-6GQX395J9C"
+﻿// Configuração do Firebase
+const firebaseConfig = {
+    apiKey: "AIzaSyC-IlMNSPg4MmDDFqUSGAAO_dL_absBDLo",
+    authDomain: "cartoes-88211.firebaseapp.com",
+    projectId: "cartoes-88211",
+    storageBucket: "cartoes-88211.appspot.com",
+    messagingSenderId: "314683342095",
+    appId: "1:314683342095:web:7625eef34a666bc7c2127a",
+    measurementId: "G-XB902LGX5S"
 };
 
 // Inicializa Firebase
-export const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
-export const db = getFirestore(app);
+firebase.initializeApp(firebaseConfig);
 
-// Persistência de login
-setPersistence(auth, browserLocalPersistence);
+// Firestore
+const db = firebase.firestore();
 
-// ======================================================
-// Exportações para uso em outros módulos
-// ======================================================
-export {
-  onAuthStateChanged,
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signOut,
-  updatePassword,
-  doc,
-  setDoc,
-  getDoc,
-  updateDoc,
-  addDoc,
-  getDocs,
-  collection,
-  query,
-  where,
-  serverTimestamp,
-  orderBy,
-  deleteDoc
-};
+// Storage (apenas se necessário)
+let storage;
+if (typeof firebase.storage === "function") {
+    storage = firebase.storage();
+} else {
+    console.warn("Firebase Storage não carregado. Apenas Firestore disponível.");
+}
