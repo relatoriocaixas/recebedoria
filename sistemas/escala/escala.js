@@ -1,6 +1,4 @@
-﻿// escala.js — versão final corrigida
-import { db, auth } from "../../firebaseConfig.js";
-
+﻿import { db, auth } from "../../firebaseConfig.js";
 import {
   collection,
   getDocs,
@@ -14,6 +12,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const selectMatricula = document.getElementById("selectMatricula");
   const selectPeriodo = document.getElementById("selectPeriodo");
+  const selectTipo = document.getElementById("selectTipo");
   const calGrid = document.getElementById("calGrid");
   const monthLabel = document.getElementById("monthLabel");
   const btnNovo = document.getElementById("btnNovo");
@@ -71,7 +70,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // === 🔹 Calendário
+  // === 🔹 Carregar calendário
   async function carregarCalendario() {
     const ano = mesAtual.getFullYear();
     const mes = mesAtual.getMonth();
@@ -83,15 +82,15 @@ document.addEventListener("DOMContentLoaded", () => {
       year: "numeric"
     });
 
-    const matricula = selectMatricula.value;
-    if (!matricula) return;
-
     escalaSelecionada = {};
+
     const snap = await getDocs(collection(db, "escalas"));
     snap.forEach((docSnap) => {
       const e = docSnap.data();
-      if (e.matricula === matricula && e.periodo === selectPeriodo.value) {
-        escalaSelecionada[e.data] = e;
+      // Admin vê todos, usuário só sua própria matricula
+      if (admin || e.matricula === selectMatricula.value) {
+        if (!escalaSelecionada[e.data]) escalaSelecionada[e.data] = [];
+        escalaSelecionada[e.data].push(e);
       }
     });
 
@@ -120,14 +119,14 @@ document.addEventListener("DOMContentLoaded", () => {
       num.textContent = dia;
       diaDiv.appendChild(num);
 
-      const escala = escalaSelecionada[dataKey];
-      if (escala) {
-        diaDiv.classList.add(escala.tipo === "folga" ? "folga" : "troca");
+      const escalasDoDia = escalaSelecionada[dataKey] || [];
+      escalasDoDia.forEach((escala) => {
         const desc = document.createElement("div");
         desc.classList.add("desc");
-        desc.textContent = escala.descricao || escala.tipo;
+        desc.textContent = `${escala.tipo === "folga" ? "Folga" : "Troca"}: ${escala.descricao || ""}`;
+        diaDiv.classList.add(escala.tipo);
         diaDiv.appendChild(desc);
-      }
+      });
 
       if (admin) {
         diaDiv.onclick = () => abrirModal(dataKey);
@@ -142,7 +141,8 @@ document.addEventListener("DOMContentLoaded", () => {
     dataSelecionada = data;
     modalBack.style.display = "flex";
 
-    const escala = escalaSelecionada[data];
+    const escalasDoDia = escalaSelecionada[data] || [];
+    const escala = escalasDoDia.find(e => e.matricula === selectMatricula.value && e.periodo === selectPeriodo.value);
     modalTipo.value = escala?.tipo || "folga";
     modalDesc.value = escala?.descricao || "";
   }
@@ -156,6 +156,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const descricao = modalDesc.value;
     const matricula = selectMatricula.value;
     const periodo = selectPeriodo.value;
+
+    if (!matricula || !periodo) {
+      alert("Selecione a matrícula e o período.");
+      return;
+    }
 
     await setDoc(doc(db, "escalas", `${matricula}_${periodo}_${dataSelecionada}`), {
       matricula,
