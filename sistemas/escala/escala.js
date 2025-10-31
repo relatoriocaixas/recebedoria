@@ -4,12 +4,12 @@ import {
   collection,
   getDocs,
   setDoc,
-  doc
+  doc,
+  query,
+  orderBy
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
 document.addEventListener("DOMContentLoaded", () => {
-  console.log("[escala] Iniciado");
-
   const selectMatricula = document.getElementById("selectMatricula");
   const selectPeriodo = document.getElementById("selectPeriodo");
   const selectTipo = document.getElementById("selectTipo");
@@ -39,28 +39,31 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
     userAtual = user;
-    console.log("[escala] Usuário:", user.email);
-
-    await carregarUsuarios();
+    await carregarUsuarios(); 
     await carregarCalendario();
     escalaWrap.style.visibility = "visible";
   });
 
-  // Carregar usuários e popular select
+  // Carregar usuários (mesma lógica do iframe diferenças)
   async function carregarUsuarios() {
-    const snap = await getDocs(collection(db, "users"));
     selectMatricula.innerHTML = "";
-    let usuarioDoc = null;
+    matriculasCores = {};
 
-    snap.forEach((docSnap, index) => {
+    const q = query(collection(db, "users"), orderBy("matricula", "asc"));
+    const snap = await getDocs(q);
+
+    let usuarioDoc = null;
+    let indexCor = 0;
+
+    snap.forEach((docSnap) => {
       const u = docSnap.data();
       const opt = document.createElement("option");
       opt.value = u.matricula;
       opt.textContent = `${u.matricula} - ${u.nome || u.matricula}`;
       selectMatricula.appendChild(opt);
 
-      // Armazena cor por matrícula
-      matriculasCores[u.matricula] = cores[index % cores.length];
+      matriculasCores[u.matricula] = cores[indexCor % cores.length];
+      indexCor++;
 
       if (u.uid === userAtual.uid) usuarioDoc = u;
     });
@@ -75,17 +78,13 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Carregar calendário
   async function carregarCalendario() {
     const ano = mesAtual.getFullYear();
     const mes = mesAtual.getMonth();
     const primeiroDia = new Date(ano, mes, 1);
     const ultimoDia = new Date(ano, mes + 1, 0);
 
-    monthLabel.textContent = primeiroDia.toLocaleString("pt-BR", {
-      month: "long",
-      year: "numeric"
-    });
+    monthLabel.textContent = primeiroDia.toLocaleString("pt-BR", { month: "long", year: "numeric" });
 
     escalaSelecionada = {};
 
@@ -135,7 +134,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Salvar folga/troca
   btnSalvar.onclick = async () => {
     const matricula = selectMatricula.value;
     const periodo = selectPeriodo.value;
@@ -159,7 +157,6 @@ document.addEventListener("DOMContentLoaded", () => {
     inputDia.value = "";
   };
 
-  // Navegação de meses
   prevMonth.onclick = () => {
     mesAtual.setMonth(mesAtual.getMonth() - 1);
     carregarCalendario();
