@@ -31,7 +31,17 @@ document.addEventListener("DOMContentLoaded", () => {
   let dataSelecionada = null;
   let mesAtual = new Date();
 
-  // === 🔹 Autenticação
+  const corPorMatricula = {};
+  function getCor(matricula) {
+    if (!corPorMatricula[matricula]) {
+      const r = 50 + Math.floor(Math.random() * 155);
+      const g = 50 + Math.floor(Math.random() * 155);
+      const b = 50 + Math.floor(Math.random() * 155);
+      corPorMatricula[matricula] = `rgba(${r},${g},${b},0.6)`;
+    }
+    return corPorMatricula[matricula];
+  }
+
   auth.onAuthStateChanged(async (user) => {
     if (!user) {
       window.location.href = "../../index.html";
@@ -43,7 +53,6 @@ document.addEventListener("DOMContentLoaded", () => {
     await carregarCalendario();
   });
 
-  // === 🔹 Carregar usuários (matrículas)
   async function carregarUsuarios() {
     const snap = await getDocs(collection(db, "users"));
     selectMatricula.innerHTML = "";
@@ -55,7 +64,6 @@ document.addEventListener("DOMContentLoaded", () => {
       opt.value = u.matricula;
       opt.textContent = `${u.matricula} - ${u.nome || u.matricula}`;
       selectMatricula.appendChild(opt);
-
       if (u.uid === userAtual.uid) usuarioDoc = u;
     });
 
@@ -70,7 +78,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // === 🔹 Carregar calendário
   async function carregarCalendario() {
     const ano = mesAtual.getFullYear();
     const mes = mesAtual.getMonth();
@@ -83,11 +90,9 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     escalaSelecionada = {};
-
     const snap = await getDocs(collection(db, "escalas"));
     snap.forEach((docSnap) => {
       const e = docSnap.data();
-      // Admin vê todos, usuário só sua própria matricula
       if (admin || e.matricula === selectMatricula.value) {
         if (!escalaSelecionada[e.data]) escalaSelecionada[e.data] = [];
         escalaSelecionada[e.data].push(e);
@@ -101,7 +106,6 @@ document.addEventListener("DOMContentLoaded", () => {
     calGrid.innerHTML = "";
     const primeiroDiaSemana = primeiroDia.getDay();
 
-    // Preenche espaços em branco antes do primeiro dia
     for (let i = 0; i < primeiroDiaSemana; i++) {
       const div = document.createElement("div");
       div.classList.add("day");
@@ -123,33 +127,30 @@ document.addEventListener("DOMContentLoaded", () => {
       escalasDoDia.forEach((escala) => {
         const desc = document.createElement("div");
         desc.classList.add("desc");
-        desc.textContent = `${escala.tipo === "folga" ? "Folga" : "Troca"}: ${escala.descricao || ""}`;
+        desc.textContent = `${escala.matricula} - ${escala.tipo}`;
+        desc.style.background = getCor(escala.matricula);
+        desc.style.padding = "2px 4px";
+        desc.style.borderRadius = "4px";
         diaDiv.classList.add(escala.tipo);
         diaDiv.appendChild(desc);
       });
 
-      if (admin) {
-        diaDiv.onclick = () => abrirModal(dataKey);
-      }
+      if (admin) diaDiv.onclick = () => abrirModal(dataKey);
 
       calGrid.appendChild(diaDiv);
     }
   }
 
-  // === 🔹 Modal
   function abrirModal(data) {
     dataSelecionada = data;
     modalBack.style.display = "flex";
-
     const escalasDoDia = escalaSelecionada[data] || [];
     const escala = escalasDoDia.find(e => e.matricula === selectMatricula.value && e.periodo === selectPeriodo.value);
     modalTipo.value = escala?.tipo || "folga";
     modalDesc.value = escala?.descricao || "";
   }
 
-  btnCancel.onclick = () => {
-    modalBack.style.display = "none";
-  };
+  btnCancel.onclick = () => { modalBack.style.display = "none"; };
 
   btnSave.onclick = async () => {
     const tipo = modalTipo.value;
@@ -182,17 +183,8 @@ document.addEventListener("DOMContentLoaded", () => {
     await carregarCalendario();
   };
 
-  // === 🔹 Navegação de meses
-  prevMonth.onclick = () => {
-    mesAtual.setMonth(mesAtual.getMonth() - 1);
-    carregarCalendario();
-  };
-
-  nextMonth.onclick = () => {
-    mesAtual.setMonth(mesAtual.getMonth() + 1);
-    carregarCalendario();
-  };
-
+  prevMonth.onclick = () => { mesAtual.setMonth(mesAtual.getMonth() - 1); carregarCalendario(); };
+  nextMonth.onclick = () => { mesAtual.setMonth(mesAtual.getMonth() + 1); carregarCalendario(); };
   selectMatricula.addEventListener("change", carregarCalendario);
   selectPeriodo.addEventListener("change", carregarCalendario);
 });

@@ -4,17 +4,14 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Escala — Portal Unificado</title>
-  <!-- usa o style.css do portal (mesmo background) -->
   <link rel="stylesheet" href="../../style.css">
   <style>
-    /* ajustes locais para a tela de escala */
     .escala-wrap { padding:18px; color:var(--text); height:100%; display:flex; flex-direction:column; gap:12px; }
     .controls { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
     select,input,button,textarea { background: rgba(20,20,20,0.6); border:1px solid rgba(255,255,255,0.04); color:var(--text); padding:8px; border-radius:6px; }
     button.primary { background:#4da6ff; color:#fff; border:none; }
     .calendar { background: rgba(10,10,10,0.45); border-radius:8px; padding:12px; flex:1; overflow:auto; }
     .cal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
-    .month-nav { display:flex; gap:8px; align-items:center; }
     .grid { display:grid; grid-template-columns:repeat(7,1fr); gap:6px; }
     .grid .day { min-height:90px; background:rgba(255,255,255,0.02); border-radius:6px; padding:6px; position:relative; }
     .grid .day .num { position:absolute; top:6px; right:8px; font-weight:700; color:var(--muted); }
@@ -23,14 +20,12 @@
     .day .desc { margin-top:22px; font-size:0.85rem; line-height:1.1; white-space:pre-wrap; color:var(--text); }
     .weeknames { display:grid; grid-template-columns:repeat(7,1fr); gap:6px; margin-bottom:6px; }
     .weeknames div { text-align:center; color:var(--muted); font-size:0.85rem; }
-    /* Modal */
     .modal-back { position:fixed; inset:0; background:rgba(0,0,0,0.6); display:none; align-items:center; justify-content:center; z-index:10000; }
     .modal { width:420px; max-width:94%; background:linear-gradient(#0b0c0e,#101214); border-radius:10px; padding:14px; box-shadow:0 8px 40px rgba(0,0,0,0.6); }
     .modal h3 { margin:0 0 8px 0; }
     .modal .row { display:flex; gap:8px; margin-bottom:8px; }
     .modal .actions { display:flex; justify-content:space-between; gap:8px; margin-top:10px; }
     .small-muted { font-size:0.85rem; color:var(--muted); }
-    /* responsivo */
     @media(max-width:800px){ .grid .day { min-height:72px; } }
   </style>
 </head>
@@ -79,7 +74,6 @@
     </div>
   </div>
 
-  <!-- Modal estilizada -->
   <div id="modalBack" class="modal-back">
     <div class="modal" role="dialog" aria-modal="true">
       <h3 id="modalTitle">Editar dia</h3>
