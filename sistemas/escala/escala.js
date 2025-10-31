@@ -1,15 +1,8 @@
 ﻿import { db, auth } from "../../firebaseConfig.js";
-import {
-  collection,
-  getDocs,
-  setDoc,
-  deleteDoc,
-  doc
-} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+import { collection, getDocs, setDoc, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
-document.addEventListener("DOMContentLoaded", () => {
-  console.log("[escala] Iniciado");
-
+document.addEventListener("DOMContentLoaded", async () => {
+  const wrap = document.querySelector(".escala-wrap");
   const selectMatricula = document.getElementById("selectMatricula");
   const selectPeriodo = document.getElementById("selectPeriodo");
   const selectTipo = document.getElementById("selectTipo");
@@ -25,166 +18,123 @@ document.addEventListener("DOMContentLoaded", () => {
   const prevMonth = document.getElementById("prevMonth");
   const nextMonth = document.getElementById("nextMonth");
 
-  let userAtual = null;
-  let admin = false;
-  let escalaSelecionada = {};
-  let dataSelecionada = null;
-  let mesAtual = new Date();
-
+  let userAtual = null, admin=false, escalaSelecionada={}, dataSelecionada=null, mesAtual=new Date();
   const corPorMatricula = {};
-  function getCor(matricula) {
-    if (!corPorMatricula[matricula]) {
-      const r = 50 + Math.floor(Math.random() * 155);
-      const g = 50 + Math.floor(Math.random() * 155);
-      const b = 50 + Math.floor(Math.random() * 155);
-      corPorMatricula[matricula] = `rgba(${r},${g},${b},0.6)`;
+  const getCor = (matricula) => {
+    if(!corPorMatricula[matricula]){
+      const r = 50+Math.floor(Math.random()*155);
+      const g = 50+Math.floor(Math.random()*155);
+      const b = 50+Math.floor(Math.random()*155);
+      corPorMatricula[matricula] = `rgba(${r},${g},${b},0.7)`;
     }
     return corPorMatricula[matricula];
-  }
+  };
 
-  auth.onAuthStateChanged(async (user) => {
-    if (!user) {
-      window.location.href = "../../index.html";
-      return;
-    }
+  auth.onAuthStateChanged(async (user)=>{
+    if(!user) return; // não sair do iframe
     userAtual = user;
-    console.log("[escala] Usuário:", user.email);
     await carregarUsuarios();
     await carregarCalendario();
+    wrap.style.visibility="visible";
   });
 
-  async function carregarUsuarios() {
-    const snap = await getDocs(collection(db, "users"));
-    selectMatricula.innerHTML = "";
-    let usuarioDoc = null;
-
-    snap.forEach((docSnap) => {
-      const u = docSnap.data();
-      const opt = document.createElement("option");
-      opt.value = u.matricula;
-      opt.textContent = `${u.matricula} - ${u.nome || u.matricula}`;
+  async function carregarUsuarios(){
+    const snap = await getDocs(collection(db,"users"));
+    selectMatricula.innerHTML="";
+    let usuarioDoc=null;
+    snap.forEach(docSnap=>{
+      const u=docSnap.data();
+      const opt=document.createElement("option");
+      opt.value=u.matricula;
+      opt.textContent=`${u.matricula} - ${u.nome||u.matricula}`;
       selectMatricula.appendChild(opt);
-      if (u.uid === userAtual.uid) usuarioDoc = u;
+      if(u.uid===userAtual.uid) usuarioDoc=u;
     });
-
-    if (usuarioDoc?.admin) {
-      admin = true;
-      selectMatricula.disabled = false;
+    if(usuarioDoc?.admin){
+      admin=true; selectMatricula.disabled=false;
     } else {
-      admin = false;
-      selectMatricula.value = usuarioDoc?.matricula || "";
-      selectMatricula.disabled = true;
-      btnNovo.style.display = "none";
+      admin=false;
+      selectMatricula.value=usuarioDoc?.matricula||"";
+      selectMatricula.disabled=true;
+      btnNovo.style.display="none";
     }
   }
 
-  async function carregarCalendario() {
-    const ano = mesAtual.getFullYear();
-    const mes = mesAtual.getMonth();
-    const primeiroDia = new Date(ano, mes, 1);
-    const ultimoDia = new Date(ano, mes + 1, 0);
+  async function carregarCalendario(){
+    const ano=mesAtual.getFullYear();
+    const mes=mesAtual.getMonth();
+    const primeiroDia=new Date(ano,mes,1);
+    const ultimoDia=new Date(ano,mes+1,0);
+    monthLabel.textContent=primeiroDia.toLocaleString("pt-BR",{month:"long", year:"numeric"});
+    escalaSelecionada={};
 
-    monthLabel.textContent = primeiroDia.toLocaleString("pt-BR", {
-      month: "long",
-      year: "numeric"
-    });
-
-    escalaSelecionada = {};
-    const snap = await getDocs(collection(db, "escalas"));
-    snap.forEach((docSnap) => {
+    const snap = await getDocs(collection(db,"escalas"));
+    snap.forEach(docSnap=>{
       const e = docSnap.data();
-      if (admin || e.matricula === selectMatricula.value) {
-        if (!escalaSelecionada[e.data]) escalaSelecionada[e.data] = [];
+      if(admin || e.matricula===selectMatricula.value){
+        if(!escalaSelecionada[e.data]) escalaSelecionada[e.data]=[];
         escalaSelecionada[e.data].push(e);
       }
     });
 
-    renderizarCalendario(primeiroDia, ultimoDia);
+    renderizarCalendario(primeiroDia,ultimoDia);
   }
 
-  function renderizarCalendario(primeiroDia, ultimoDia) {
-    calGrid.innerHTML = "";
-    const primeiroDiaSemana = primeiroDia.getDay();
+  function renderizarCalendario(primeiroDia,ultimoDia){
+    calGrid.innerHTML="";
+    const primeiroDiaSemana=primeiroDia.getDay();
+    for(let i=0;i<primeiroDiaSemana;i++) calGrid.appendChild(document.createElement("div")).classList.add("day");
 
-    for (let i = 0; i < primeiroDiaSemana; i++) {
-      const div = document.createElement("div");
-      div.classList.add("day");
-      calGrid.appendChild(div);
-    }
-
-    for (let dia = 1; dia <= ultimoDia.getDate(); dia++) {
-      const dataAtual = new Date(primeiroDia.getFullYear(), primeiroDia.getMonth(), dia);
-      const dataKey = dataAtual.toISOString().split("T")[0];
-      const diaDiv = document.createElement("div");
+    for(let dia=1;dia<=ultimoDia.getDate();dia++){
+      const dataAtual=new Date(primeiroDia.getFullYear(),primeiroDia.getMonth(),dia);
+      const dataKey=dataAtual.toISOString().split("T")[0];
+      const diaDiv=document.createElement("div");
       diaDiv.classList.add("day");
-
-      const num = document.createElement("div");
-      num.classList.add("num");
-      num.textContent = dia;
+      const num=document.createElement("div");
+      num.classList.add("num"); num.textContent=dia;
       diaDiv.appendChild(num);
 
-      const escalasDoDia = escalaSelecionada[dataKey] || [];
-      escalasDoDia.forEach((escala) => {
-        const desc = document.createElement("div");
+      const escalasDoDia=escalaSelecionada[dataKey]||[];
+      escalasDoDia.forEach(e=>{
+        const desc=document.createElement("div");
         desc.classList.add("desc");
-        desc.textContent = `${escala.matricula} - ${escala.tipo}`;
-        desc.style.background = getCor(escala.matricula);
-        desc.style.padding = "2px 4px";
-        desc.style.borderRadius = "4px";
-        diaDiv.classList.add(escala.tipo);
+        desc.textContent=`${e.matricula} (${e.tipo})`;
+        desc.style.background=getCor(e.matricula);
         diaDiv.appendChild(desc);
       });
 
-      if (admin) diaDiv.onclick = () => abrirModal(dataKey);
-
+      diaDiv.onclick=()=>{ dataSelecionada=dataKey; modalBack.style.display="flex";
+        const esc = escalasDoDia.find(x=>x.matricula===selectMatricula.value && x.periodo===selectPeriodo.value);
+        modalTipo.value=esc?.tipo||"folga"; modalDesc.value=esc?.descricao||"";
+      };
       calGrid.appendChild(diaDiv);
     }
   }
 
-  function abrirModal(data) {
-    dataSelecionada = data;
-    modalBack.style.display = "flex";
-    const escalasDoDia = escalaSelecionada[data] || [];
-    const escala = escalasDoDia.find(e => e.matricula === selectMatricula.value && e.periodo === selectPeriodo.value);
-    modalTipo.value = escala?.tipo || "folga";
-    modalDesc.value = escala?.descricao || "";
+  btnCancel.onclick=()=>modalBack.style.display="none";
+
+  btnSave.onclick=async()=>{
+    const tipo=modalTipo.value;
+    const descricao=modalDesc.value;
+    const matricula=selectMatricula.value;
+    const periodo=selectPeriodo.value;
+    if(!matricula || !periodo) return alert("Selecione matrícula e período");
+
+    await setDoc(doc(db,"escalas",`${matricula}_${periodo}_${dataSelecionada}`),{
+      matricula, periodo, data:dataSelecionada, tipo, descricao
+    });
+    modalBack.style.display="none"; await carregarCalendario();
   }
 
-  btnCancel.onclick = () => { modalBack.style.display = "none"; };
+  btnDelete.onclick=async()=>{
+    const matricula=selectMatricula.value;
+    const periodo=selectPeriodo.value;
+    await deleteDoc(doc(db,"escalas",`${matricula}_${periodo}_${dataSelecionada}`));
+    modalBack.style.display="none"; await carregarCalendario();
+  }
 
-  btnSave.onclick = async () => {
-    const tipo = modalTipo.value;
-    const descricao = modalDesc.value;
-    const matricula = selectMatricula.value;
-    const periodo = selectPeriodo.value;
-
-    if (!matricula || !periodo) {
-      alert("Selecione a matrícula e o período.");
-      return;
-    }
-
-    await setDoc(doc(db, "escalas", `${matricula}_${periodo}_${dataSelecionada}`), {
-      matricula,
-      periodo,
-      data: dataSelecionada,
-      tipo,
-      descricao
-    });
-
-    modalBack.style.display = "none";
-    await carregarCalendario();
-  };
-
-  btnDelete.onclick = async () => {
-    const matricula = selectMatricula.value;
-    const periodo = selectPeriodo.value;
-    await deleteDoc(doc(db, "escalas", `${matricula}_${periodo}_${dataSelecionada}`));
-    modalBack.style.display = "none";
-    await carregarCalendario();
-  };
-
-  prevMonth.onclick = () => { mesAtual.setMonth(mesAtual.getMonth() - 1); carregarCalendario(); };
-  nextMonth.onclick = () => { mesAtual.setMonth(mesAtual.getMonth() + 1); carregarCalendario(); };
-  selectMatricula.addEventListener("change", carregarCalendario);
-  selectPeriodo.addEventListener("change", carregarCalendario);
+  prevMonth.onclick=()=>{ mesAtual.setMonth(mesAtual.getMonth()-1); carregarCalendario(); };
+  nextMonth.onclick=()=>{ mesAtual.setMonth(mesAtual.getMonth()+1); carregarCalendario(); };
+  selectMatricula.addEventListener("change",carregarCalendario);
+  selectPeriodo.addEventListener("change",carregarCalendario);
 });

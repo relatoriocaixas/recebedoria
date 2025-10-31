@@ -1,107 +1,99 @@
 ﻿<!doctype html>
 <html lang="pt-BR">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Escala — Portal Unificado</title>
-  <link rel="stylesheet" href="../../style.css">
-  <style>
-    .escala-wrap { padding:18px; color:var(--text); height:100%; display:flex; flex-direction:column; gap:12px; }
-    .controls { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
-    select,input,button,textarea { background: rgba(20,20,20,0.6); border:1px solid rgba(255,255,255,0.04); color:var(--text); padding:8px; border-radius:6px; }
-    button.primary { background:#4da6ff; color:#fff; border:none; }
-    .calendar { background: rgba(10,10,10,0.45); border-radius:8px; padding:12px; flex:1; overflow:auto; }
-    .cal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
-    .grid { display:grid; grid-template-columns:repeat(7,1fr); gap:6px; }
-    .grid .day { min-height:90px; background:rgba(255,255,255,0.02); border-radius:6px; padding:6px; position:relative; }
-    .grid .day .num { position:absolute; top:6px; right:8px; font-weight:700; color:var(--muted); }
-    .day.folga { background: rgba(30,120,60,0.18); border:1px solid rgba(30,120,60,0.28); }
-    .day.troca { background: rgba(200,150,30,0.14); border:1px solid rgba(200,150,30,0.28); }
-    .day .desc { margin-top:22px; font-size:0.85rem; line-height:1.1; white-space:pre-wrap; color:var(--text); }
-    .weeknames { display:grid; grid-template-columns:repeat(7,1fr); gap:6px; margin-bottom:6px; }
-    .weeknames div { text-align:center; color:var(--muted); font-size:0.85rem; }
-    .modal-back { position:fixed; inset:0; background:rgba(0,0,0,0.6); display:none; align-items:center; justify-content:center; z-index:10000; }
-    .modal { width:420px; max-width:94%; background:linear-gradient(#0b0c0e,#101214); border-radius:10px; padding:14px; box-shadow:0 8px 40px rgba(0,0,0,0.6); }
-    .modal h3 { margin:0 0 8px 0; }
-    .modal .row { display:flex; gap:8px; margin-bottom:8px; }
-    .modal .actions { display:flex; justify-content:space-between; gap:8px; margin-top:10px; }
-    .small-muted { font-size:0.85rem; color:var(--muted); }
-    @media(max-width:800px){ .grid .day { min-height:72px; } }
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Escala — Portal Unificado</title>
+<link rel="stylesheet" href="../../style.css">
+<style>
+  .escala-wrap { padding:18px; color:var(--text); height:100%; display:flex; flex-direction:column; gap:12px; visibility:hidden; }
+  .controls { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+  select,input,button,textarea { background: rgba(20,20,20,0.6); border:1px solid rgba(255,255,255,0.04); color:var(--text); padding:8px; border-radius:6px; }
+  button.primary { background:#4da6ff; color:#fff; border:none; }
+  .calendar { background: rgba(10,10,10,0.45); border-radius:8px; padding:12px; flex:1; overflow:auto; }
+  .cal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+  .grid { display:grid; grid-template-columns:repeat(7,1fr); gap:6px; }
+  .grid .day { min-height:90px; background:rgba(255,255,255,0.02); border-radius:6px; padding:6px; position:relative; display:flex; flex-direction:column; gap:2px; cursor:pointer; }
+  .grid .day .num { position:absolute; top:6px; right:8px; font-weight:700; color:var(--muted); }
+  .day .desc { font-size:0.75rem; line-height:1; white-space:nowrap; color:#fff; padding:2px 4px; border-radius:4px; overflow:hidden; text-overflow:ellipsis; }
+  .weeknames { display:grid; grid-template-columns:repeat(7,1fr); gap:6px; margin-bottom:6px; }
+  .weeknames div { text-align:center; color:var(--muted); font-size:0.85rem; }
+  .modal-back { position:fixed; inset:0; background:rgba(0,0,0,0.6); display:none; align-items:center; justify-content:center; z-index:10000; }
+  .modal { width:420px; max-width:94%; background:linear-gradient(#0b0c0e,#101214); border-radius:10px; padding:14px; box-shadow:0 8px 40px rgba(0,0,0,0.6); }
+  .modal h3 { margin:0 0 8px 0; }
+  .modal .row { display:flex; gap:8px; margin-bottom:8px; }
+  .modal .actions { display:flex; justify-content:space-between; gap:8px; margin-top:10px; }
+  .small-muted { font-size:0.85rem; color:var(--muted); }
+  @media(max-width:800px){ .grid .day { min-height:72px; } }
+</style>
 </head>
 <body>
-  <div class="escala-wrap">
-    <div class="controls">
-      <label class="small-muted">Matrícula:
-        <select id="selectMatricula"></select>
-      </label>
+<div class="escala-wrap">
+  <div class="controls">
+    <label class="small-muted">Matrícula:
+      <select id="selectMatricula"></select>
+    </label>
+    <label class="small-muted">Período:
+      <select id="selectPeriodo">
+        <option value="manha">Manhã</option>
+        <option value="tarde">Tarde</option>
+        <option value="noite">Noite</option>
+      </select>
+    </label>
+    <label class="small-muted">Tipo:
+      <select id="selectTipo">
+        <option value="folga">Folga</option>
+        <option value="troca">Troca de horário</option>
+      </select>
+    </label>
+    <button id="btnNovo" class="primary">Novo Lançamento</button>
+    <div style="margin-left:auto; display:flex; gap:8px; align-items:center;">
+      <button id="prevMonth">◀</button>
+      <div id="monthLabel" class="small-muted"></div>
+      <button id="nextMonth">▶</button>
+    </div>
+  </div>
 
-      <label class="small-muted">Período:
-        <select id="selectPeriodo">
-          <option value="manha">Manhã</option>
-          <option value="tarde">Tarde</option>
-          <option value="noite">Noite</option>
-        </select>
-      </label>
+  <div class="calendar">
+    <div class="cal-header">
+      <div class="small-muted">Clique em um dia para adicionar/editar</div>
+      <div id="statusInfo" class="small-muted"></div>
+    </div>
+    <div class="weeknames">
+      <div>Dom</div><div>Seg</div><div>Ter</div><div>Qua</div><div>Qui</div><div>Sex</div><div>Sáb</div>
+    </div>
+    <div id="calGrid" class="grid"></div>
+  </div>
+</div>
 
-      <label class="small-muted">Tipo:
-        <select id="selectTipo">
+<div id="modalBack" class="modal-back">
+  <div class="modal" role="dialog" aria-modal="true">
+    <h3 id="modalTitle">Editar dia</h3>
+    <div class="row">
+      <label style="flex:1">Tipo:
+        <select id="modalTipo" style="width:100%">
           <option value="folga">Folga</option>
           <option value="troca">Troca de horário</option>
         </select>
       </label>
-
-      <button id="btnNovo" class="primary">Novo Lançamento</button>
-
-      <div style="margin-left:auto; display:flex; gap:8px; align-items:center;">
-        <button id="prevMonth">◀</button>
-        <div id="monthLabel" class="small-muted"></div>
-        <button id="nextMonth">▶</button>
-      </div>
     </div>
-
-    <div class="calendar">
-      <div class="cal-header">
-        <div class="small-muted">Clique em um dia para adicionar/editar</div>
-        <div id="statusInfo" class="small-muted"></div>
-      </div>
-
-      <div class="weeknames">
-        <div>Dom</div><div>Seg</div><div>Ter</div><div>Qua</div><div>Qui</div><div>Sex</div><div>Sáb</div>
-      </div>
-
-      <div id="calGrid" class="grid"></div>
+    <div class="row">
+      <label style="flex:1">Descrição:
+        <textarea id="modalDesc" rows="3" style="width:100%"></textarea>
+      </label>
     </div>
-  </div>
-
-  <div id="modalBack" class="modal-back">
-    <div class="modal" role="dialog" aria-modal="true">
-      <h3 id="modalTitle">Editar dia</h3>
-      <div class="row">
-        <label style="flex:1">Tipo:
-          <select id="modalTipo" style="width:100%">
-            <option value="folga">Folga</option>
-            <option value="troca">Troca de horário</option>
-          </select>
-        </label>
+    <div class="actions">
+      <div>
+        <button id="btnDelete" style="background:#ff4d4d;color:#fff;border:none;padding:8px;border-radius:6px;">Excluir</button>
       </div>
-      <div class="row">
-        <label style="flex:1">Descrição:
-          <textarea id="modalDesc" rows="3" style="width:100%"></textarea>
-        </label>
-      </div>
-      <div class="actions">
-        <div>
-          <button id="btnDelete" style="background:#ff4d4d;color:#fff;border:none;padding:8px;border-radius:6px;">Excluir</button>
-        </div>
-        <div style="display:flex; gap:8px;">
-          <button id="btnCancel">Cancelar</button>
-          <button id="btnSave" class="primary">Salvar</button>
-        </div>
+      <div style="display:flex; gap:8px;">
+        <button id="btnCancel">Cancelar</button>
+        <button id="btnSave" class="primary">Salvar</button>
       </div>
     </div>
   </div>
+</div>
 
-  <script type="module" src="escala.js"></script>
+<script type="module" src="escala.js"></script>
 </body>
 </html>
