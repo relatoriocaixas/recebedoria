@@ -1,112 +1,141 @@
-﻿// escala.js
-import { auth, db } from "./firebaseConfig.js";
-import { doc, getDoc, setDoc, collection, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
-import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-storage.js";
+﻿import { auth, db } from "../../firebaseConfig.js";
+import {
+  onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+import {
+  doc, getDoc, updateDoc, getDocs, collection
+} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+import {
+  getStorage, ref, uploadBytes, getDownloadURL
+} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-storage.js";
 
 const storage = getStorage();
-
-// Elementos do DOM
-const matriculaSelect = document.getElementById('matriculaSelect');
-const periodoSelect = document.getElementById('periodoSelect');
-const fileInput = document.getElementById('fileInput');
-const uploadBtn = document.getElementById('uploadBtn');
-const escalaTableBody = document.getElementById('escalaTableBody');
+const matriculaSel = document.getElementById("matriculaSel");
+const periodoSel = document.getElementById("periodoSel");
+const escalaTexto = document.getElementById("escalaTexto");
+const fileInput = document.getElementById("fileInput");
+const salvarBtn = document.getElementById("salvarBtn");
+const excluirBtn = document.getElementById("excluirBtn");
+const listaEscalas = document.getElementById("listaEscalas");
+const statusDiv = document.getElementById("status");
 
 let currentUser = null;
 let isAdmin = false;
 
-// 🔹 Inicialização
-auth.onAuthStateChanged(async (user) => {
-  if (!user) return window.location.href = '../login.html';
+onAuthStateChanged(auth, async (user) => {
+  if (!user) return (window.top.location.href = "../../login.html");
   currentUser = user;
 
-  const userSnap = await getDoc(doc(db, 'users', user.uid));
-  isAdmin = userSnap.exists() && userSnap.data().admin === true;
+  const userDoc = await getDoc(doc(db, "users", user.uid));
+  const data = userDoc.data();
+  isAdmin = data?.admin || false;
 
-  await populateMatriculas();
-  await loadEscalas();
+  if (isAdmin) {
+    carregarUsuarios();
+  } else {
+    matriculaSel.innerHTML = `<option value="${user.uid}">${data.matricula}</option>`;
+    matriculaSel.disabled = true; // funcionário não pode trocar matrícula
+    salvarBtn.style.display = "none"; // não pode salvar
+    excluirBtn.style.display = "none"; // não pode excluir
+    fileInput.disabled = true; // não pode enviar arquivo
+    escalaTexto.disabled = true; // não pode editar
+  }
+
+  carregarEscalas();
 });
 
-// 🔹 Carrega matrículas para seleção
-async function populateMatriculas() {
-  const usersSnap = await getDocs(collection(db, 'users'));
-  matriculaSelect.innerHTML = '';
-
-  usersSnap.forEach(u => {
-    const data = u.data();
-    const option = document.createElement('option');
-    option.value = data.matricula;
-    option.textContent = `${data.matricula} - ${data.nome}`;
-    matriculaSelect.appendChild(option);
+// 🔹 Carrega todos os usuários para admins
+async function carregarUsuarios() {
+  const snap = await getDocs(collection(db, "users"));
+  matriculaSel.innerHTML = "";
+  snap.forEach((u) => {
+    const d = u.data();
+    const opt = document.createElement("option");
+    opt.value = u.id;
+    opt.textContent = `${d.matricula || u.id}`;
+    matriculaSel.appendChild(opt);
   });
 }
-
-// 🔹 Upload de arquivo
-uploadBtn.addEventListener('click', async () => {
-  const matricula = matriculaSelect.value;
-  const periodo = periodoSelect.value;
-  const file = fileInput.files[0];
-
-  if (!matricula || !periodo || !file) return alert('Selecione matrícula, período e arquivo');
-
-  const storageRef = ref(storage, `escalas/${matricula}_${periodo}_${file.name}`);
-  await uploadBytes(storageRef, file);
-  const url = await getDownloadURL(storageRef);
-
-  // Salva referência no Firestore
-  const escalaRef = doc(db, 'escalas', `${matricula}_${periodo}_${file.name}`);
-  await setDoc(escalaRef, {
-    matricula,
-    periodo,
-    nomeArquivo: file.name,
-    url,
-    uploadedBy: currentUser.uid,
-    timestamp: new Date()
-  });
-
-  alert('Escala enviada com sucesso!');
-  fileInput.value = '';
-  await loadEscalas();
-});
 
 // 🔹 Carrega escalas
-async function loadEscalas() {
-  escalaTableBody.innerHTML = '';
-  const escalasSnap = await getDocs(collection(db, 'escalas'));
+async function carregarEscalas() {
+  listaEscalas.innerHTML = "";
+  const usersSnap = await getDocs(collection(db, "users"));
+  usersSnap.forEach((u) => {
+    const d = u.data();
 
-  escalasSnap.forEach(docSnap => {
-    const data = docSnap.data();
+    // 🔹 Se não for admin, só mostra escalas do próprio usuário
+    if (!isAdmin && u.id !== currentUser.uid) return;
 
-    // Filtra visibilidade para usuários comuns
-    if (!isAdmin && (data.matricula !== currentUser.email.split('@')[0])) return;
-
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${data.matricula}</td>
-      <td>${data.periodo}</td>
-      <td><a href="${data.url}" target="_blank">${data.nomeArquivo}</a></td>
-      <td>${isAdmin ? `<button data-id="${docSnap.id}" class="deleteBtn">Excluir</button>` : ''}</td>
-    `;
-    escalaTableBody.appendChild(tr);
+    if (d.escala) {
+      Object.entries(d.escala).forEach(([periodo, esc]) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${d.matricula}</td>
+          <td>${periodo}</td>
+          <td>${esc?.arquivoURL ? `<a href="${esc.arquivoURL}" target="_blank">Ver arquivo</a>` : "-"}</td>
+          <td>${isAdmin ? `<button class="deleteBtn" data-uid="${u.id}" data-p="${periodo}">Excluir</button>` : ""}</td>
+        `;
+        listaEscalas.appendChild(tr);
+      });
+    }
   });
 
-  // Bind delete buttons
-  document.querySelectorAll('.deleteBtn').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const docId = btn.dataset.id;
-      const docRef = doc(db, 'escalas', docId);
-      const docSnap = await getDoc(docRef);
-      if (!docSnap.exists()) return;
-
-      const data = docSnap.data();
-      const storageRef = ref(storage, `escalas/${data.matricula}_${data.periodo}_${data.nomeArquivo}`);
-
-      if (confirm(`Excluir escala ${data.nomeArquivo} do período ${data.periodo} da matrícula ${data.matricula}?`)) {
-        await deleteDoc(docRef);
-        await deleteObject(storageRef);
-        alert('Escala excluída!');
-        await loadEscalas();
-      }
+  if (isAdmin) {
+    document.querySelectorAll(".deleteBtn").forEach((btn) => {
+      btn.onclick = async () => {
+        const uid = btn.dataset.uid;
+        const periodo = btn.dataset.p;
+        if (!confirm(`Excluir escala de ${periodo} para ${uid}?`)) return;
+        await updateDoc(doc(db, "users", uid), {
+          [`escala.${periodo}`]: null
+        });
+        carregarEscalas();
+      };
     });
-  });
+  }
 }
+
+// 🔹 Salvar escala (somente admins)
+salvarBtn.onclick = async () => {
+  const uid = matriculaSel.value;
+  const periodo = periodoSel.value;
+  const texto = escalaTexto.value.trim();
+  const file = fileInput.files[0];
+
+  if (!uid) return alert("Selecione uma matrícula.");
+  if (!periodo) return alert("Selecione um período.");
+
+  let arquivoURL = null;
+  if (file) {
+    const path = `escalas/${uid}/${periodo}_${file.name}`;
+    const fileRef = ref(storage, path);
+    await uploadBytes(fileRef, file);
+    arquivoURL = await getDownloadURL(fileRef);
+  }
+
+  await updateDoc(doc(db, "users", uid), {
+    [`escala.${periodo}`]: {
+      texto: texto || "",
+      arquivoURL: arquivoURL || null,
+      updatedAt: new Date()
+    }
+  });
+
+  statusDiv.textContent = `Escala (${periodo}) salva para ${uid}.`;
+  escalaTexto.value = "";
+  fileInput.value = "";
+  carregarEscalas();
+};
+
+// 🔹 Exclusão manual (somente admins)
+excluirBtn.onclick = async () => {
+  const uid = matriculaSel.value;
+  const periodo = periodoSel.value;
+  if (!confirm(`Excluir escala de ${periodo} para ${uid}?`)) return;
+  await updateDoc(doc(db, "users", uid), {
+    [`escala.${periodo}`]: null
+  });
+  statusDiv.textContent = `Escala (${periodo}) excluída para ${uid}.`;
+  carregarEscalas();
+};
