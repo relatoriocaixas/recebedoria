@@ -1,7 +1,4 @@
-// ============================================================
-// script.js — Portal Unificado v2 (versão estável com correção de autenticação)
-// ============================================================
-
+// script.js
 import { auth, db } from "./firebaseConfig.js";
 import {
   onAuthStateChanged,
@@ -10,9 +7,6 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
-// ============================================================
-// ELEMENTOS DOM
-// ============================================================
 const sidebar = document.getElementById('sidebar');
 const logoutBtn = document.getElementById('logoutBtn');
 const changePassBtn = document.getElementById('changePassBtn');
@@ -22,9 +16,6 @@ const iframeContainer = document.getElementById('iframeContainer');
 const avisosSection = document.getElementById('avisosSection');
 const dataVigenteSpan = document.getElementById('dataVigente');
 
-// ============================================================
-// ROTAS DO SISTEMA
-// ============================================================
 const ROUTES = {
   home: null,
   abastecimento: "sistemas/abastecimento/index.html",
@@ -33,9 +24,7 @@ const ROUTES = {
   diferencas: "sistemas/diferencas/index.html"
 };
 
-// ============================================================
-// TELA DE CARREGAMENTO
-// ============================================================
+// 🔹 Tela de carregamento
 const loadingOverlay = document.createElement('div');
 loadingOverlay.id = 'loadingOverlay';
 loadingOverlay.innerHTML = `
@@ -44,17 +33,10 @@ loadingOverlay.innerHTML = `
 `;
 document.body.appendChild(loadingOverlay);
 
-function showLoading() {
-  loadingOverlay.style.display = 'flex';
-}
+function showLoading() { loadingOverlay.style.display = 'flex'; }
+function hideLoading() { loadingOverlay.style.display = 'none'; }
 
-function hideLoading() {
-  loadingOverlay.style.display = 'none';
-}
-
-// ============================================================
-// FUNÇÕES DE NAVEGAÇÃO
-// ============================================================
+// 🔹 Função para ir à tela inicial
 function goHome() {
   iframeContainer.classList.remove('full');
   iframeContainer.style.display = 'none';
@@ -62,6 +44,7 @@ function goHome() {
   sidebar.style.display = 'flex';
 }
 
+// 🔹 Função para abrir uma rota no iframe
 function openRoute(route) {
   const src = ROUTES[route];
   if (!src) {
@@ -74,7 +57,6 @@ function openRoute(route) {
   iframeContainer.style.display = 'block';
   iframeContainer.classList.add('full');
 
-  // Remove listeners antigos
   frame.onload = null;
   frame.onload = async () => {
     await sendAuthToIframe();
@@ -84,9 +66,7 @@ function openRoute(route) {
   frame.src = src;
 }
 
-// ============================================================
-// EVENTOS DA SIDEBAR
-// ============================================================
+// 🔹 Atalhos da barra lateral
 document.querySelectorAll('.sidebar li').forEach(li => {
   li.addEventListener('click', () => {
     const t = li.dataset.target;
@@ -95,9 +75,7 @@ document.querySelectorAll('.sidebar li').forEach(li => {
   });
 });
 
-// ============================================================
-// DATA VIGENTE
-// ============================================================
+// 🔹 Atualiza o #dataVigente com a data atual
 if (dataVigenteSpan) {
   const hoje = new Date();
   const dia = String(hoje.getDate()).padStart(2, '0');
@@ -106,9 +84,7 @@ if (dataVigenteSpan) {
   dataVigenteSpan.textContent = `${dia}/${mes}/${ano}`;
 }
 
-// ============================================================
-// GARANTE QUE O USUÁRIO EXISTE NO FIRESTORE
-// ============================================================
+// 🔹 Garante que o usuário exista em "users"
 async function ensureUserInFirestore(user) {
   try {
     const userRef = doc(db, "users", user.uid);
@@ -116,7 +92,7 @@ async function ensureUserInFirestore(user) {
     const parts = (user.email || '').split('@');
     const matricula = parts[0] || '';
     const domain = parts[1] || '';
-    const isAdmin = domain.toLowerCase() === 'movebuss.local';
+    const isAdmin = domain.toLowerCase() === 'movebuss.local'; // admin automático
 
     if (!userSnap.exists()) {
       await setDoc(userRef, {
@@ -137,19 +113,22 @@ async function ensureUserInFirestore(user) {
     }
   } catch (e) {
     console.error("Erro ao salvar usuário em 'users':", e);
+    throw e;
   }
 }
 
 // ============================================================
-// CONTROLE DE LOGIN — COM VERIFICAÇÃO E TOLERÂNCIA DE TOKEN
+// 🔹 AUTENTICAÇÃO COM TELA DE CARREGAMENTO INTELIGENTE
 // ============================================================
 let authChecked = false;
+let retryCount = 0;
+const MAX_RETRIES = 3;
 
 onAuthStateChanged(auth, async (user) => {
   showLoading();
 
   if (!user) {
-    // Aguarda até 2 segundos antes de decidir redirecionar
+    // Espera um pouco para evitar falsos negativos
     setTimeout(async () => {
       const currentUser = auth.currentUser;
       if (!currentUser && !authChecked) {
@@ -176,20 +155,29 @@ onAuthStateChanged(auth, async (user) => {
       sidebarBadge.textContent = matricula;
     });
 
-    // Envia token inicial antes de liberar interface
     await sendAuthToIframe();
-
     goHome();
-  } catch (err) {
-    console.error("Erro ao inicializar usuário:", err);
-  } finally {
     hideLoading();
+
+  } catch (err) {
+    console.warn("⚠️ Falha temporária ao inicializar usuário:", err);
+
+    if (retryCount < MAX_RETRIES) {
+      retryCount++;
+      console.log(`Tentando novamente (${retryCount}/${MAX_RETRIES})...`);
+      setTimeout(() => {
+        onAuthStateChanged(auth, () => {});
+      }, 1500);
+      return;
+    }
+
+    // Depois de 3 tentativas falhas, mantém tela de loading (sem piscar)
+    console.error("Erro persistente — mantendo tela de carregamento.");
+    showLoading();
   }
 });
 
-// ============================================================
-// ENVIO SEGURO DE TOKEN PARA IFRAME
-// ============================================================
+// 🔹 Envio seguro do auth
 async function sendAuthToIframe() {
   try {
     const user = auth.currentUser;
@@ -213,14 +201,13 @@ async function sendAuthToIframe() {
   }
 }
 
-// ============================================================
-// BOTÕES DE SAIR E ALTERAR SENHA
-// ============================================================
+// 🔹 Botão sair
 logoutBtn.addEventListener('click', async () => {
   await signOut(auth);
   window.location.href = 'login.html';
 });
 
+// 🔹 Botão alterar senha
 changePassBtn.addEventListener('click', async () => {
   const user = auth.currentUser;
   if (!user) return alert('Usuário não autenticado.');
