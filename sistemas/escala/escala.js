@@ -15,6 +15,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   let userAtual = null, admin=false, escalaSelecionada={}, mesAtual=new Date();
   const corPorMatricula={};
+
   const getCor = (matricula)=>{
     if(!corPorMatricula[matricula]){
       const r=50+Math.floor(Math.random()*155);
@@ -100,5 +101,24 @@ document.addEventListener("DOMContentLoaded", async () => {
     const tipo=selectTipo.value;
     const dia=inputDia.value;
     if(!matricula || !periodo || !dia) return alert("Preencha matrícula, período e dia");
+
+    await setDoc(doc(db,"escalas",`${matricula}_${periodo}_${dia}`),{
+      matricula,
+      periodo,
+      data: dia,
+      tipo
+    });
+
+    await carregarCalendario();
+    inputDia.value="";
+  };
+
+  prevMonth.onclick=()=>{ mesAtual.setMonth(mesAtual.getMonth()-1); carregarCalendario(); };
+  nextMonth.onclick=()=>{ mesAtual.setMonth(mesAtual.getMonth()+1); carregarCalendario(); };
+
+  selectMatricula.addEventListener("change", carregarCalendario);
+  selectPeriodo.addEventListener("change", carregarCalendario);
+  selectTipo.addEventListener("change", carregarCalendario);
+});
 
    
