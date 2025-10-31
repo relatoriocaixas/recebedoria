@@ -1,4 +1,7 @@
-// portal/script.js
+// ============================================================
+// script.js — Portal Unificado v2 (versão estável com correção de autenticação)
+// ============================================================
+
 import { auth, db } from "./firebaseConfig.js";
 import {
   onAuthStateChanged,
@@ -7,7 +10,9 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
-// 🔹 Elementos principais
+// ============================================================
+// ELEMENTOS DOM
+// ============================================================
 const sidebar = document.getElementById('sidebar');
 const logoutBtn = document.getElementById('logoutBtn');
 const changePassBtn = document.getElementById('changePassBtn');
@@ -17,7 +22,9 @@ const iframeContainer = document.getElementById('iframeContainer');
 const avisosSection = document.getElementById('avisosSection');
 const dataVigenteSpan = document.getElementById('dataVigente');
 
-// 🔹 Rotas do portal
+// ============================================================
+// ROTAS DO SISTEMA
+// ============================================================
 const ROUTES = {
   home: null,
   abastecimento: "sistemas/abastecimento/index.html",
@@ -26,7 +33,9 @@ const ROUTES = {
   diferencas: "sistemas/diferencas/index.html"
 };
 
-// 🔹 Tela de carregamento
+// ============================================================
+// TELA DE CARREGAMENTO
+// ============================================================
 const loadingOverlay = document.createElement('div');
 loadingOverlay.id = 'loadingOverlay';
 loadingOverlay.innerHTML = `
@@ -35,10 +44,17 @@ loadingOverlay.innerHTML = `
 `;
 document.body.appendChild(loadingOverlay);
 
-function showLoading() { loadingOverlay.style.display = 'flex'; }
-function hideLoading() { loadingOverlay.style.display = 'none'; }
+function showLoading() {
+  loadingOverlay.style.display = 'flex';
+}
 
-// 🔹 Ir à tela inicial
+function hideLoading() {
+  loadingOverlay.style.display = 'none';
+}
+
+// ============================================================
+// FUNÇÕES DE NAVEGAÇÃO
+// ============================================================
 function goHome() {
   iframeContainer.classList.remove('full');
   iframeContainer.style.display = 'none';
@@ -46,79 +62,31 @@ function goHome() {
   sidebar.style.display = 'flex';
 }
 
-// 🔹 Abre módulo com controle de token
-async function openRoute(route) {
+function openRoute(route) {
   const src = ROUTES[route];
-  if (!src) return goHome();
+  if (!src) {
+    goHome();
+    return;
+  }
 
   showLoading();
+  avisosSection.style.display = 'none';
+  iframeContainer.style.display = 'block';
+  iframeContainer.classList.add('full');
 
-  try {
-    const user = auth.currentUser;
-    if (!user) {
-      alert("Sessão expirada. Faça login novamente.");
-      return window.location.href = "login.html";
-    }
-
-    // 🔸 Força o Firebase a renovar token antes do iframe
-    const idToken = await new Promise((resolve, reject) => {
-      const start = Date.now();
-      const check = async () => {
-        try {
-          const t = await user.getIdToken(true);
-          if (t) return resolve(t);
-        } catch {}
-        if (Date.now() - start > 5000) reject("Timeout token");
-        else setTimeout(check, 250);
-      };
-      check();
-    });
-
-    // 🔸 Esconde avisos e prepara container
-    avisosSection.style.display = 'none';
-    iframeContainer.style.display = 'block';
-    iframeContainer.classList.add('full');
-
-    // 🔸 Recria iframe limpo
-    const newFrame = document.createElement('iframe');
-    newFrame.id = 'mainFrame';
-    newFrame.style.display = 'none';
-    iframeContainer.innerHTML = "";
-    iframeContainer.appendChild(newFrame);
-
-    // 🔸 Espera iframe carregar
-    await new Promise((resolve, reject) => {
-      newFrame.onload = () => resolve();
-      newFrame.onerror = () => reject("Falha ao carregar");
-      newFrame.src = src;
-    });
-
-    // 🔸 Envia token e dados
-    const parts = (user.email || '').split('@');
-    const payload = {
-      type: 'syncAuth',
-      usuario: {
-        matricula: parts[0] || '',
-        email: user.email || '',
-        nome: user.displayName || ''
-      },
-      idToken
-    };
-    newFrame.contentWindow.postMessage(payload, '*');
-
-    // 🔸 Exibe somente após sincronizar
-    setTimeout(() => {
-      newFrame.style.display = 'block';
-      hideLoading();
-    }, 500);
-  } catch (err) {
-    console.error("Erro ao abrir módulo:", err);
-    alert("Erro ao carregar o sistema. Tente novamente.");
+  // Remove listeners antigos
+  frame.onload = null;
+  frame.onload = async () => {
+    await sendAuthToIframe();
     hideLoading();
-  }
+  };
+
+  frame.src = src;
 }
 
-// 🔹 Atalhos da barra lateral
+// ============================================================
+// EVENTOS DA SIDEBAR
+// ============================================================
 document.querySelectorAll('.sidebar li').forEach(li => {
   li.addEventListener('click', () => {
     const t = li.dataset.target;
@@ -127,7 +95,9 @@ document.querySelectorAll('.sidebar li').forEach(li => {
   });
 });
 
-// 🔹 Atualiza a data
+// ============================================================
+// DATA VIGENTE
+// ============================================================
 if (dataVigenteSpan) {
   const hoje = new Date();
   const dia = String(hoje.getDate()).padStart(2, '0');
@@ -136,47 +106,65 @@ if (dataVigenteSpan) {
   dataVigenteSpan.textContent = `${dia}/${mes}/${ano}`;
 }
 
-// 🔹 Garante que o usuário existe no Firestore
+// ============================================================
+// GARANTE QUE O USUÁRIO EXISTE NO FIRESTORE
+// ============================================================
 async function ensureUserInFirestore(user) {
   try {
     const userRef = doc(db, "users", user.uid);
-    const snap = await getDoc(userRef);
-    const [matricula, domain] = (user.email || '').split('@');
-    const isAdmin = (domain || '').toLowerCase() === 'movebuss.local';
+    const userSnap = await getDoc(userRef);
+    const parts = (user.email || '').split('@');
+    const matricula = parts[0] || '';
+    const domain = parts[1] || '';
+    const isAdmin = domain.toLowerCase() === 'movebuss.local';
 
-    if (!snap.exists()) {
+    if (!userSnap.exists()) {
       await setDoc(userRef, {
         uid: user.uid,
         email: user.email || '',
-        matricula: matricula || '',
-        nome: user.displayName || matricula || '',
+        matricula,
+        nome: user.displayName || matricula,
         admin: isAdmin,
         createdAt: new Date()
       });
+      console.log("Usuário adicionado à coleção 'users'.");
     } else {
-      const existing = snap.data();
+      const existing = userSnap.data();
       if (existing.admin !== isAdmin) {
         await setDoc(userRef, { ...existing, admin: isAdmin }, { merge: true });
+        console.log("Campo 'admin' atualizado conforme domínio.");
       }
     }
   } catch (e) {
-    console.error("Erro Firestore:", e);
+    console.error("Erro ao salvar usuário em 'users':", e);
   }
 }
 
-// 🔹 Controle de login com sincronização e proteção
+// ============================================================
+// CONTROLE DE LOGIN — COM VERIFICAÇÃO E TOLERÂNCIA DE TOKEN
+// ============================================================
+let authChecked = false;
+
 onAuthStateChanged(auth, async (user) => {
   showLoading();
 
   if (!user) {
-    hideLoading();
-    return window.location.href = 'login.html';
+    // Aguarda até 2 segundos antes de decidir redirecionar
+    setTimeout(async () => {
+      const currentUser = auth.currentUser;
+      if (!currentUser && !authChecked) {
+        authChecked = true;
+        hideLoading();
+        window.location.href = 'login.html';
+      }
+    }, 2000);
+    return;
   }
 
   try {
+    authChecked = true;
     await ensureUserInFirestore(user);
 
-    // Mostra interface
     sidebar.classList.remove('hidden');
     const [matricula] = (user.email || '').split('@');
     sidebarBadge.textContent = matricula;
@@ -188,28 +176,30 @@ onAuthStateChanged(auth, async (user) => {
       sidebarBadge.textContent = matricula;
     });
 
-    // Espera token e envia ao iframe inicial (se houver)
+    // Envia token inicial antes de liberar interface
     await sendAuthToIframe();
 
     goHome();
-    hideLoading();
   } catch (err) {
     console.error("Erro ao inicializar usuário:", err);
+  } finally {
     hideLoading();
   }
 });
 
-// 🔹 Envio seguro de autenticação
+// ============================================================
+// ENVIO SEGURO DE TOKEN PARA IFRAME
+// ============================================================
 async function sendAuthToIframe() {
   try {
     const user = auth.currentUser;
     if (!user) return;
-    const [matricula] = (user.email || '').split('@');
+    const parts = (user.email || '').split('@');
     const idToken = await user.getIdToken();
     const payload = {
       type: 'syncAuth',
       usuario: {
-        matricula: matricula || '',
+        matricula: parts[0] || '',
         email: user.email || '',
         nome: user.displayName || ''
       },
@@ -223,13 +213,14 @@ async function sendAuthToIframe() {
   }
 }
 
-// 🔹 Botão sair
+// ============================================================
+// BOTÕES DE SAIR E ALTERAR SENHA
+// ============================================================
 logoutBtn.addEventListener('click', async () => {
   await signOut(auth);
   window.location.href = 'login.html';
 });
 
-// 🔹 Alterar senha
 changePassBtn.addEventListener('click', async () => {
   const user = auth.currentUser;
   if (!user) return alert('Usuário não autenticado.');
@@ -243,11 +234,11 @@ changePassBtn.addEventListener('click', async () => {
   } catch (e) {
     console.error('Erro ao alterar senha:', e);
     if (e.code === 'auth/requires-recent-login') {
-      alert('Por segurança, faça login novamente.');
+      alert('Por segurança, faça login novamente antes de alterar a senha.');
       await signOut(auth);
       window.location.href = 'login.html';
     } else {
-      alert('Erro: ' + (e?.message || e));
+      alert('Erro ao alterar senha: ' + (e?.message || e));
     }
   }
 });
