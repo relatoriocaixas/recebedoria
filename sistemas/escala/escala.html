@@ -3,45 +3,32 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Escala - Portal Unificado</title>
+  <title>Escala</title>
   <link rel="stylesheet" href="style.css">
-  <script type="module" src="firebaseConfig.js"></script>
-  <script type="module" src="escala.js"></script>
-  <style>
-    body { background: #f5f5f5; font-family: Arial, sans-serif; }
-    .container { max-width: 900px; margin: 40px auto; padding: 20px; background: white; border-radius: 10px; box-shadow: 0 0 12px rgba(0,0,0,0.1); }
-    h2 { margin-bottom: 20px; text-align: center; }
-    select, input[type=file], button { margin: 10px 0; padding: 8px; width: 100%; max-width: 300px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-    th, td { padding: 8px; border: 1px solid #ddd; text-align: left; }
-    th { background: #f0f0f0; }
-    .deleteBtn { background: #e74c3c; color: white; border: none; padding: 4px 8px; cursor: pointer; border-radius: 4px; }
-    .deleteBtn:hover { background: #c0392b; }
-  </style>
 </head>
 <body>
-  <div class="container">
-    <h2>Gerenciar Escala</h2>
+  <div class="main-content">
+    <h1>Escala de Funcionários</h1>
 
-    <label for="periodoSelect">Período:</label>
-    <select id="periodoSelect">
-      <option value="">Selecione o período</option>
-      <option value="manha">Manhã</option>
-      <option value="tarde">Tarde</option>
-      <option value="noite">Noite</option>
-    </select>
+    <!-- Seleção de matrícula e período -->
+    <div style="display:flex; gap:12px; margin-bottom:16px;">
+      <select id="matriculaSelect">
+        <option value="">Selecione a matrícula</option>
+      </select>
 
-    <label for="matriculaSelect">Matrícula:</label>
-    <select id="matriculaSelect">
-      <option value="">Carregando matrículas...</option>
-    </select>
+      <select id="periodoSelect">
+        <option value="">Selecione o período</option>
+        <option value="manha">Manhã</option>
+        <option value="tarde">Tarde</option>
+        <option value="noite">Noite</option>
+      </select>
 
-    <label for="fileInput">Arquivo (PDF/Excel):</label>
-    <input type="file" id="fileInput" accept=".pdf,.xlsx,.xls">
+      <input type="file" id="fileInput" accept=".pdf,.xlsx,.xls">
+      <button id="uploadBtn" class="adminBtn">Enviar Escala</button>
+    </div>
 
-    <button id="uploadBtn">Enviar Escala</button>
-
-    <table>
+    <!-- Tabela de escalas -->
+    <table id="escalaTable">
       <thead>
         <tr>
           <th>Matrícula</th>
@@ -50,10 +37,101 @@
           <th>Ações</th>
         </tr>
       </thead>
-      <tbody id="escalaTableBody">
-        <!-- Escalas carregadas via JS -->
-      </tbody>
+      <tbody id="escalaTableBody"></tbody>
     </table>
   </div>
+
+  <!-- Firebase e script -->
+  <script type="module">
+    import { auth, db, onAuthStateChanged, collection, addDoc, getDocs, doc, deleteDoc, query, where, orderBy } from './firebaseConfig.js';
+
+    const matriculaSelect = document.getElementById('matriculaSelect');
+    const periodoSelect = document.getElementById('periodoSelect');
+    const fileInput = document.getElementById('fileInput');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const escalaTableBody = document.getElementById('escalaTableBody');
+
+    let currentUser = null;
+
+    // 🔹 Carrega usuários no select
+    async function carregarUsuarios() {
+      const usersSnap = await getDocs(collection(db, 'users'));
+      matriculaSelect.innerHTML = '<option value="">Selecione a matrícula</option>';
+      usersSnap.forEach(doc => {
+        const data = doc.data();
+        const option = document.createElement('option');
+        option.value = data.matricula;
+        option.textContent = `${data.matricula} - ${data.nome}`;
+        matriculaSelect.appendChild(option);
+      });
+    }
+
+    // 🔹 Carrega escalas
+    async function carregarEscalas() {
+      const q = query(collection(db, 'escalas'), orderBy('createdAt', 'desc'));
+      const snapshot = await getDocs(q);
+      escalaTableBody.innerHTML = '';
+
+      snapshot.forEach(docSnap => {
+        const data = docSnap.data();
+        const tr = document.createElement('tr');
+
+        // Se o usuário não for admin, só mostra suas escalas
+        if (!currentUser.admin && data.matricula !== currentUser.matricula) return;
+
+        tr.innerHTML = `
+          <td>${data.matricula}</td>
+          <td>${data.periodo}</td>
+          <td><a href="${data.fileURL}" target="_blank">${data.fileName}</a></td>
+          <td>${currentUser.admin ? `<button class="delBtn">Excluir</button>` : ''}</td>
+        `;
+
+        if (currentUser.admin) {
+          tr.querySelector('.delBtn').onclick = async () => {
+            await deleteDoc(doc(db, 'escalas', docSnap.id));
+            carregarEscalas();
+          };
+        }
+
+        escalaTableBody.appendChild(tr);
+      });
+    }
+
+    // 🔹 Upload de escala
+    uploadBtn.onclick = async () => {
+      const matricula = matriculaSelect.value;
+      const periodo = periodoSelect.value;
+      const file = fileInput.files[0];
+
+      if (!matricula || !periodo || !file) {
+        alert('Selecione matrícula, período e arquivo.');
+        return;
+      }
+
+      // Salvar arquivo como URL temporária (simulação, no seu Firebase Storage você colocaria a URL real)
+      const fileURL = URL.createObjectURL(file);
+
+      await addDoc(collection(db, 'escalas'), {
+        matricula,
+        periodo,
+        fileName: file.name,
+        fileURL,
+        createdAt: new Date()
+      });
+
+      fileInput.value = '';
+      carregarEscalas();
+      alert('Escala enviada com sucesso!');
+    };
+
+    // 🔹 Autenticação
+    onAuthStateChanged(auth, async user => {
+      if (!user) return window.location.href = '../login.html';
+      currentUser = { uid: user.uid, email: user.email, matricula: user.email.split('@')[0], admin: user.email.includes('@movebuss.local') };
+      await carregarUsuarios();
+      await carregarEscalas();
+    });
+
+  </script>
 </body>
 </html>
