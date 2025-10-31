@@ -1,5 +1,4 @@
-﻿// escala.js
-import { db, auth } from "../../firebaseConfig.js";
+﻿import { db, auth } from "../../firebaseConfig.js";
 import {
   collection,
   getDocs,
@@ -27,12 +26,8 @@ document.addEventListener("DOMContentLoaded", () => {
   let mesAtual = new Date();
   let matriculasCores = {};
 
-  const cores = [
-    "#f94144","#f3722c","#f8961e","#f9844a","#f9c74f",
-    "#90be6d","#43aa8b","#4d908e","#577590","#277da1"
-  ];
+  const cores = ["#f94144","#f3722c","#f8961e","#f9844a","#f9c74f","#90be6d","#43aa8b","#4d908e","#577590","#277da1"];
 
-  // Autenticação
   auth.onAuthStateChanged(async (user) => {
     if (!user) {
       window.location.href = "../../index.html";
@@ -44,11 +39,9 @@ document.addEventListener("DOMContentLoaded", () => {
     escalaWrap.style.visibility = "visible";
   });
 
-  // Carregar usuários (mesma lógica do iframe diferenças)
   async function carregarUsuarios() {
     selectMatricula.innerHTML = "";
     matriculasCores = {};
-
     const q = query(collection(db, "users"), orderBy("matricula", "asc"));
     const snap = await getDocs(q);
 
