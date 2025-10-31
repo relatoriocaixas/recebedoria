@@ -224,3 +224,49 @@ html,body { height:100%; margin:0; background:var(--bg); color:var(--text); over
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
+
+.tabela-calendario {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: center;
+  background: rgba(255,255,255,0.05);
+  border-radius: 12px;
+}
+
+.tabela-calendario th {
+  background: rgba(255,255,255,0.15);
+  padding: 8px;
+  color: #fff;
+}
+
+.tabela-calendario td {
+  width: 14.2%;
+  height: 80px;
+  border: 1px solid rgba(255,255,255,0.1);
+  vertical-align: top;
+  color: #fff;
+  position: relative;
+  cursor: pointer;
+}
+
+.tabela-calendario td.folga {
+  background: rgba(0, 255, 128, 0.2);
+}
+
+.tabela-calendario td.troca {
+  background: rgba(0, 128, 255, 0.2);
+}
+
+.descricao {
+  font-size: 0.75rem;
+  margin-top: 4px;
+}
+
+dialog#modalEdicao {
+  background: #202020;
+  color: #fff;
+  padding: 20px;
+  border-radius: 12px;
+  border: none;
+  max-width: 320px;
+}

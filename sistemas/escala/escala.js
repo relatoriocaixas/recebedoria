@@ -1,272 +1,185 @@
-﻿// escala.js
-import { auth, db } from '../../firebaseConfig.js';
-import {
-  onAuthStateChanged, doc, getDoc, setDoc, getDocs, collection, query, where, updateDoc
-} from '../../firebaseConfig.js';
+﻿// escala.js — versão compatível com o portal
+import { 
+  db, auth,
+  collection, getDocs, setDoc, deleteDoc, doc 
+} from "../../firebaseConfig.js";
 
-// ----------------- UI refs -----------------
-const selectMatricula = document.getElementById('selectMatricula');
-const selectPeriodo = document.getElementById('selectPeriodo');
-const selectTipo = document.getElementById('selectTipo');
-const btnNovo = document.getElementById('btnNovo');
-const calGrid = document.getElementById('calGrid');
-const monthLabel = document.getElementById('monthLabel');
-const prevMonth = document.getElementById('prevMonth');
-const nextMonth = document.getElementById('nextMonth');
-const modalBack = document.getElementById('modalBack');
-const modalTipo = document.getElementById('modalTipo');
-const modalDesc = document.getElementById('modalDesc');
-const btnSave = document.getElementById('btnSave');
-const btnDelete = document.getElementById('btnDelete');
-const btnCancel = document.getElementById('btnCancel');
-const statusInfo = document.getElementById('statusInfo');
+document.addEventListener("DOMContentLoaded", () => {
+  console.log("[escala] Iniciado");
 
-// ----------------- State -----------------
-let currentUser = null;
-let currentUserDoc = null;
-let isAdmin = false;
-let usersList = [];
-let viewYear, viewMonth; // month: 0..11
-let editingDate = null; // ISO date string 'YYYY-MM-DD'
-let editingDocId = null; // doc id string
-let editingMatricula = null;
-let editingPeriodo = null;
+  const selectMatricula = document.getElementById("selectMatricula");
+  const selectPeriodo = document.getElementById("selectPeriodo");
+  const selectTipo = document.getElementById("selectTipo");
+  const calGrid = document.getElementById("calGrid");
+  const monthLabel = document.getElementById("monthLabel");
+  const btnNovo = document.getElementById("btnNovo");
+  const modalBack = document.getElementById("modalBack");
+  const modalTipo = document.getElementById("modalTipo");
+  const modalDesc = document.getElementById("modalDesc");
+  const btnSave = document.getElementById("btnSave");
+  const btnDelete = document.getElementById("btnDelete");
+  const btnCancel = document.getElementById("btnCancel");
+  const prevMonth = document.getElementById("prevMonth");
+  const nextMonth = document.getElementById("nextMonth");
 
-// ----------------- Helpers -----------------
-const pad = (n) => String(n).padStart(2, '0');
-const isoDate = (y, m, d) => `${y}-${pad(m)}-${pad(d)}`;
-const docIdFor = (mat, periodo, y, m) => `${mat}_${periodo}_${y}-${pad(m)}`;
+  let userAtual = null;
+  let admin = false;
+  let escalaSelecionada = {};
+  let dataSelecionada = null;
+  let mesAtual = new Date();
 
-// ----------------- Load users -----------------
-async function carregarUsuarios() {
-  selectMatricula.innerHTML = '<option value="">Carregando...</option>';
-  usersList = [];
-  try {
-    const snaps = await getDocs(collection(db, 'users'));
-    snaps.forEach(s => {
-      const d = s.data();
-      if (d && d.matricula) usersList.push({ matricula: d.matricula, nome: d.nome || d.matricula });
-    });
-    selectMatricula.innerHTML = '';
-    if (usersList.length === 0) {
-      const fallbackMat = currentUserDoc?.matricula || (currentUser?.email?.split('@')[0]) || '0000';
-      usersList.push({ matricula: fallbackMat, nome: fallbackMat });
+  // === 🔹 Autenticação
+  auth.onAuthStateChanged(async (user) => {
+    if (!user) {
+      window.location.href = "../../index.html";
+      return;
     }
-    usersList.forEach(u => {
-      const opt = document.createElement('option');
+    userAtual = user;
+    console.log("[escala] Usuário:", user.email);
+    await carregarUsuarios();
+    await carregarCalendario();
+  });
+
+  // === 🔹 Carregar usuários (matrículas)
+  async function carregarUsuarios() {
+    const snap = await getDocs(collection(db, "users"));
+    selectMatricula.innerHTML = "";
+    let usuarioDoc = null;
+
+    snap.forEach((docSnap) => {
+      const u = docSnap.data();
+      const opt = document.createElement("option");
       opt.value = u.matricula;
-      opt.textContent = `${u.matricula} - ${u.nome}`;
+      opt.textContent = `${u.matricula} - ${u.nome || u.matricula}`;
       selectMatricula.appendChild(opt);
+
+      if (u.uid === userAtual.uid) usuarioDoc = u;
     });
-  } catch (e) {
-    console.error('Erro ao carregar usuários:', e);
-    selectMatricula.innerHTML = '<option value="">Erro ao carregar</option>';
-  }
-}
 
-// ----------------- Calendar -----------------
-function setView(year, month) {
-  viewYear = year; viewMonth = month;
-  monthLabel.textContent = `${viewYear}-${pad(viewMonth + 1)}`;
-  renderCalendar();
-}
-
-function firstDayOfMonth(year, month) {
-  return new Date(year, month, 1).getDay(); // 0..6 (Dom..Sáb)
-}
-function daysInMonth(year, month) {
-  return new Date(year, month + 1, 0).getDate();
-}
-
-async function renderCalendar() {
-  calGrid.innerHTML = '';
-
-  const matricula = selectMatricula.value || currentUserDoc?.matricula;
-  const periodo = selectPeriodo.value || 'manha';
-
-  statusInfo.textContent = matricula
-    ? `Mostrando: ${matricula} — ${periodo}`
-    : 'Nenhuma matrícula selecionada';
-
-  // sempre mostra calendário
-  const firstWeekday = firstDayOfMonth(viewYear, viewMonth);
-  const totalDays = daysInMonth(viewYear, viewMonth);
-
-  // adiciona espaços iniciais
-  for (let i = 0; i < firstWeekday; i++) {
-    const blank = document.createElement('div');
-    blank.className = 'day';
-    calGrid.appendChild(blank);
-  }
-
-  // tenta carregar dias se tiver matrícula
-  let diasObj = {};
-  if (matricula) {
-    const id = docIdFor(matricula, periodo, viewYear, viewMonth + 1);
-    editingDocId = id;
-    try {
-      const dref = doc(db, 'escalas', id);
-      const snap = await getDoc(dref);
-      if (snap.exists()) {
-        const data = snap.data();
-        diasObj = data.dias || {};
-      }
-    } catch (e) {
-      console.error('Erro ao carregar escalas:', e);
-    }
-  }
-
-  // monta dias
-  for (let d = 1; d <= totalDays; d++) {
-    const dateIso = isoDate(viewYear, viewMonth + 1, d);
-    const dayEl = document.createElement('div');
-    dayEl.className = 'day';
-    const info = diasObj[dateIso];
-
-    if (info) {
-      dayEl.classList.add(info.tipo === 'folga' ? 'folga' : 'troca');
-      dayEl.innerHTML = `<div class="num">${d}</div><div class="desc">${sanitize(info.descricao || info.tipo || '')}</div>`;
+    if (usuarioDoc?.admin) {
+      admin = true;
+      selectMatricula.disabled = false;
     } else {
-      dayEl.innerHTML = `<div class="num">${d}</div>`;
+      admin = false;
+      selectMatricula.value = usuarioDoc?.matricula || "";
+      selectMatricula.disabled = true;
+      btnNovo.style.display = "none";
     }
+  }
 
-    // clique no dia
-    dayEl.addEventListener('click', () => {
-      if (!matricula) {
-        alert('Selecione uma matrícula primeiro.');
-        return;
+  // === 🔹 Calendário
+  async function carregarCalendario() {
+    const ano = mesAtual.getFullYear();
+    const mes = mesAtual.getMonth();
+    const primeiroDia = new Date(ano, mes, 1);
+    const ultimoDia = new Date(ano, mes + 1, 0);
+
+    monthLabel.textContent = primeiroDia.toLocaleString("pt-BR", { month: "long", year: "numeric" });
+    const matricula = selectMatricula.value;
+    if (!matricula) return;
+
+    escalaSelecionada = {};
+    const snap = await getDocs(collection(db, "escalas"));
+    snap.forEach((docSnap) => {
+      const e = docSnap.data();
+      if (e.matricula === matricula && e.periodo === selectPeriodo.value) {
+        escalaSelecionada[e.data] = e;
       }
-      if (!isAdmin && matricula !== currentUserDoc?.matricula) {
-        alert('Você só pode visualizar sua própria escala.');
-        return;
-      }
-      openModal(dateIso, matricula, periodo, info);
     });
 
-    calGrid.appendChild(dayEl);
+    renderizarCalendario(primeiroDia, ultimoDia);
   }
-}
 
-function sanitize(text) {
-  if (!text) return '';
-  return text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
-}
+  function renderizarCalendario(primeiroDia, ultimoDia) {
+    calGrid.innerHTML = "";
+    const primeiroDiaSemana = primeiroDia.getDay();
 
-// ----------------- Modal -----------------
-function openModal(dateIso, matricula, periodo, info) {
-  editingDate = dateIso;
-  editingMatricula = matricula;
-  editingPeriodo = periodo;
-  modalTipo.value = info?.tipo || selectTipo.value || 'folga';
-  modalDesc.value = info?.descricao || '';
-  modalBack.style.display = 'flex';
-  document.getElementById('modalTitle').textContent = `Editar ${dateIso} — ${matricula} (${periodo})`;
-  btnDelete.style.display = info ? 'inline-block' : 'none';
-}
-
-btnCancel.onclick = () => {
-  modalBack.style.display = 'none';
-  editingDate = null;
-};
-
-btnDelete.onclick = async () => {
-  if (!editingDate || !editingDocId) return;
-  if (!confirm('Remover marcação deste dia?')) return;
-  try {
-    const dref = doc(db, 'escalas', editingDocId);
-    const snap = await getDoc(dref);
-    if (!snap.exists()) return;
-    const data = snap.data() || {};
-    const dias = data.dias || {};
-    delete dias[editingDate];
-    await setDoc(dref, { dias }, { merge: true });
-    modalBack.style.display = 'none';
-    renderCalendar();
-  } catch (e) {
-    console.error('Erro ao excluir dia:', e);
-  }
-};
-
-btnSave.onclick = async () => {
-  if (!editingDate || !editingMatricula) return;
-  const tipo = modalTipo.value;
-  const descricao = modalDesc.value.trim();
-
-  try {
-    const id = docIdFor(editingMatricula, editingPeriodo, viewYear, viewMonth + 1);
-    const dref = doc(db, 'escalas', id);
-    const snap = await getDoc(dref);
-    const data = snap.exists()
-      ? snap.data()
-      : { matricula: editingMatricula, periodo: editingPeriodo, anoMes: `${viewYear}-${pad(viewMonth + 1)}`, dias: {} };
-    data.dias = data.dias || {};
-    data.dias[editingDate] = { tipo, descricao, updatedAt: new Date(), updatedBy: currentUser.uid };
-    await setDoc(dref, data, { merge: true });
-    modalBack.style.display = 'none';
-    renderCalendar();
-  } catch (e) {
-    console.error('Erro ao salvar dia:', e);
-  }
-};
-
-// ----------------- Auth -----------------
-onAuthStateChanged(auth, async (user) => {
-  if (!user) {
-    alert('Usuário não autenticado.');
-    return;
-  }
-  currentUser = user;
-
-  try {
-    const uref = doc(db, 'users', user.uid);
-    const usnap = await getDoc(uref);
-    if (!usnap.exists()) {
-      const mat = (user.email || '').split('@')[0];
-      await setDoc(uref, {
-        uid: user.uid, email: user.email, matricula: mat, nome: mat, admin: false, createdAt: new Date()
-      });
+    // Preenche espaços em branco antes do primeiro dia
+    for (let i = 0; i < primeiroDiaSemana; i++) {
+      const div = document.createElement("div");
+      div.classList.add("day");
+      calGrid.appendChild(div);
     }
-    const data = (await getDoc(uref)).data();
-    currentUserDoc = data;
-    isAdmin = data?.admin === true;
-  } catch (e) {
-    console.error('Erro ao carregar perfil:', e);
+
+    for (let dia = 1; dia <= ultimoDia.getDate(); dia++) {
+      const dataAtual = new Date(primeiroDia.getFullYear(), primeiroDia.getMonth(), dia);
+      const dataKey = dataAtual.toISOString().split("T")[0];
+      const diaDiv = document.createElement("div");
+      diaDiv.classList.add("day");
+
+      const num = document.createElement("div");
+      num.classList.add("num");
+      num.textContent = dia;
+      diaDiv.appendChild(num);
+
+      const escala = escalaSelecionada[dataKey];
+      if (escala) {
+        diaDiv.classList.add(escala.tipo === "folga" ? "folga" : "troca");
+        const desc = document.createElement("div");
+        desc.classList.add("desc");
+        desc.textContent = escala.descricao || escala.tipo;
+        diaDiv.appendChild(desc);
+      }
+
+      if (admin) {
+        diaDiv.onclick = () => abrirModal(dataKey);
+      }
+
+      calGrid.appendChild(diaDiv);
+    }
   }
 
-  await carregarUsuarios();
+  // === 🔹 Modal
+  function abrirModal(data) {
+    dataSelecionada = data;
+    modalBack.style.display = "flex";
 
-  if (!isAdmin) {
-    selectMatricula.value = currentUserDoc.matricula;
-    selectMatricula.disabled = true;
-  } else {
-    if (selectMatricula.options.length) selectMatricula.selectedIndex = 0;
-    selectMatricula.disabled = false;
+    const escala = escalaSelecionada[data];
+    modalTipo.value = escala?.tipo || "folga";
+    modalDesc.value = escala?.descricao || "";
   }
 
-  const hoje = new Date();
-  setView(hoje.getFullYear(), hoje.getMonth());
-
-  prevMonth.onclick = () => {
-    const d = new Date(viewYear, viewMonth - 1, 1);
-    setView(d.getFullYear(), d.getMonth());
-  };
-  nextMonth.onclick = () => {
-    const d = new Date(viewYear, viewMonth + 1, 1);
-    setView(d.getFullYear(), d.getMonth());
+  btnCancel.onclick = () => {
+    modalBack.style.display = "none";
   };
 
-  selectMatricula.addEventListener('change', renderCalendar);
-  selectPeriodo.addEventListener('change', renderCalendar);
-
-  btnNovo.addEventListener('click', () => {
-    const matricula = selectMatricula.value || currentUserDoc.matricula;
+  btnSave.onclick = async () => {
+    const tipo = modalTipo.value;
+    const descricao = modalDesc.value;
+    const matricula = selectMatricula.value;
     const periodo = selectPeriodo.value;
-    const hoje = new Date();
-    const hojeIso = isoDate(hoje.getFullYear(), hoje.getMonth() + 1, hoje.getDate());
-    openModal(hojeIso, matricula, periodo, null);
-  });
 
-  modalBack.addEventListener('click', (e) => {
-    if (e.target === modalBack) modalBack.style.display = 'none';
-  });
+    await setDoc(doc(db, "escalas", `${matricula}_${periodo}_${dataSelecionada}`), {
+      matricula,
+      periodo,
+      data: dataSelecionada,
+      tipo,
+      descricao
+    });
+
+    modalBack.style.display = "none";
+    await carregarCalendario();
+  };
+
+  btnDelete.onclick = async () => {
+    const matricula = selectMatricula.value;
+    const periodo = selectPeriodo.value;
+    await deleteDoc(doc(db, "escalas", `${matricula}_${periodo}_${dataSelecionada}`));
+    modalBack.style.display = "none";
+    await carregarCalendario();
+  };
+
+  // === 🔹 Navegação de meses
+  prevMonth.onclick = () => {
+    mesAtual.setMonth(mesAtual.getMonth() - 1);
+    carregarCalendario();
+  };
+
+  nextMonth.onclick = () => {
+    mesAtual.setMonth(mesAtual.getMonth() + 1);
+    carregarCalendario();
+  };
+
+  selectMatricula.addEventListener("change", carregarCalendario);
+  selectPeriodo.addEventListener("change", carregarCalendario);
 });
