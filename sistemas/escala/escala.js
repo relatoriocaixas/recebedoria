@@ -1,31 +1,26 @@
 ﻿import { db, auth } from "../../firebaseConfig.js";
-import { collection, getDocs, setDoc, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+import { collection, getDocs, setDoc, doc } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
   const wrap = document.querySelector(".escala-wrap");
   const selectMatricula = document.getElementById("selectMatricula");
   const selectPeriodo = document.getElementById("selectPeriodo");
   const selectTipo = document.getElementById("selectTipo");
+  const inputDia = document.getElementById("inputDia");
+  const btnSalvar = document.getElementById("btnSalvar");
   const calGrid = document.getElementById("calGrid");
   const monthLabel = document.getElementById("monthLabel");
-  const btnNovo = document.getElementById("btnNovo");
-  const modalBack = document.getElementById("modalBack");
-  const modalTipo = document.getElementById("modalTipo");
-  const modalDesc = document.getElementById("modalDesc");
-  const btnSave = document.getElementById("btnSave");
-  const btnDelete = document.getElementById("btnDelete");
-  const btnCancel = document.getElementById("btnCancel");
   const prevMonth = document.getElementById("prevMonth");
   const nextMonth = document.getElementById("nextMonth");
 
-  let userAtual = null, admin=false, escalaSelecionada={}, dataSelecionada=null, mesAtual=new Date();
-  const corPorMatricula = {};
-  const getCor = (matricula) => {
+  let userAtual = null, admin=false, escalaSelecionada={}, mesAtual=new Date();
+  const corPorMatricula={};
+  const getCor = (matricula)=>{
     if(!corPorMatricula[matricula]){
-      const r = 50+Math.floor(Math.random()*155);
-      const g = 50+Math.floor(Math.random()*155);
-      const b = 50+Math.floor(Math.random()*155);
-      corPorMatricula[matricula] = `rgba(${r},${g},${b},0.7)`;
+      const r=50+Math.floor(Math.random()*155);
+      const g=50+Math.floor(Math.random()*155);
+      const b=50+Math.floor(Math.random()*155);
+      corPorMatricula[matricula]=`rgba(${r},${g},${b},0.7)`;
     }
     return corPorMatricula[matricula];
   };
@@ -50,14 +45,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       selectMatricula.appendChild(opt);
       if(u.uid===userAtual.uid) usuarioDoc=u;
     });
-    if(usuarioDoc?.admin){
-      admin=true; selectMatricula.disabled=false;
-    } else {
-      admin=false;
-      selectMatricula.value=usuarioDoc?.matricula||"";
-      selectMatricula.disabled=true;
-      btnNovo.style.display="none";
-    }
+    if(usuarioDoc?.admin){ admin=true; selectMatricula.disabled=false; }
+    else { admin=false; selectMatricula.value=usuarioDoc?.matricula||""; selectMatricula.disabled=true; }
   }
 
   async function carregarCalendario(){
@@ -70,7 +59,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const snap = await getDocs(collection(db,"escalas"));
     snap.forEach(docSnap=>{
-      const e = docSnap.data();
+      const e=docSnap.data();
       if(admin || e.matricula===selectMatricula.value){
         if(!escalaSelecionada[e.data]) escalaSelecionada[e.data]=[];
         escalaSelecionada[e.data].push(e);
@@ -88,10 +77,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     for(let dia=1;dia<=ultimoDia.getDate();dia++){
       const dataAtual=new Date(primeiroDia.getFullYear(),primeiroDia.getMonth(),dia);
       const dataKey=dataAtual.toISOString().split("T")[0];
-      const diaDiv=document.createElement("div");
-      diaDiv.classList.add("day");
-      const num=document.createElement("div");
-      num.classList.add("num"); num.textContent=dia;
+      const diaDiv=document.createElement("div"); diaDiv.classList.add("day");
+
+      const num=document.createElement("div"); num.classList.add("num"); num.textContent=dia;
       diaDiv.appendChild(num);
 
       const escalasDoDia=escalaSelecionada[dataKey]||[];
@@ -102,39 +90,15 @@ document.addEventListener("DOMContentLoaded", async () => {
         desc.style.background=getCor(e.matricula);
         diaDiv.appendChild(desc);
       });
-
-      diaDiv.onclick=()=>{ dataSelecionada=dataKey; modalBack.style.display="flex";
-        const esc = escalasDoDia.find(x=>x.matricula===selectMatricula.value && x.periodo===selectPeriodo.value);
-        modalTipo.value=esc?.tipo||"folga"; modalDesc.value=esc?.descricao||"";
-      };
       calGrid.appendChild(diaDiv);
     }
   }
 
-  btnCancel.onclick=()=>modalBack.style.display="none";
-
-  btnSave.onclick=async()=>{
-    const tipo=modalTipo.value;
-    const descricao=modalDesc.value;
+  btnSalvar.onclick=async()=>{
     const matricula=selectMatricula.value;
     const periodo=selectPeriodo.value;
-    if(!matricula || !periodo) return alert("Selecione matrícula e período");
+    const tipo=selectTipo.value;
+    const dia=inputDia.value;
+    if(!matricula || !periodo || !dia) return alert("Preencha matrícula, período e dia");
 
-    await setDoc(doc(db,"escalas",`${matricula}_${periodo}_${dataSelecionada}`),{
-      matricula, periodo, data:dataSelecionada, tipo, descricao
-    });
-    modalBack.style.display="none"; await carregarCalendario();
-  }
-
-  btnDelete.onclick=async()=>{
-    const matricula=selectMatricula.value;
-    const periodo=selectPeriodo.value;
-    await deleteDoc(doc(db,"escalas",`${matricula}_${periodo}_${dataSelecionada}`));
-    modalBack.style.display="none"; await carregarCalendario();
-  }
-
-  prevMonth.onclick=()=>{ mesAtual.setMonth(mesAtual.getMonth()-1); carregarCalendario(); };
-  nextMonth.onclick=()=>{ mesAtual.setMonth(mesAtual.getMonth()+1); carregarCalendario(); };
-  selectMatricula.addEventListener("change",carregarCalendario);
-  selectPeriodo.addEventListener("change",carregarCalendario);
-});
+   
