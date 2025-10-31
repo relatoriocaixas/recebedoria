@@ -1,137 +1,113 @@
-﻿<!DOCTYPE html>
+﻿<!doctype html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Escala</title>
-  <link rel="stylesheet" href="style.css">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Escala — Portal Unificado</title>
+  <!-- usa o style.css do portal (mesmo background) -->
+  <link rel="stylesheet" href="../../style.css">
+  <style>
+    /* ajustes locais para a tela de escala */
+    .escala-wrap { padding:18px; color:var(--text); height:100%; display:flex; flex-direction:column; gap:12px; }
+    .controls { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+    select,input,button,textarea { background: rgba(20,20,20,0.6); border:1px solid rgba(255,255,255,0.04); color:var(--text); padding:8px; border-radius:6px; }
+    button.primary { background:#4da6ff; color:#fff; border:none; }
+    .calendar { background: rgba(10,10,10,0.45); border-radius:8px; padding:12px; flex:1; overflow:auto; }
+    .cal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+    .month-nav { display:flex; gap:8px; align-items:center; }
+    .grid { display:grid; grid-template-columns:repeat(7,1fr); gap:6px; }
+    .grid .day { min-height:90px; background:rgba(255,255,255,0.02); border-radius:6px; padding:6px; position:relative; }
+    .grid .day .num { position:absolute; top:6px; right:8px; font-weight:700; color:var(--muted); }
+    .day.folga { background: rgba(30,120,60,0.18); border:1px solid rgba(30,120,60,0.28); }
+    .day.troca { background: rgba(200,150,30,0.14); border:1px solid rgba(200,150,30,0.28); }
+    .day .desc { margin-top:22px; font-size:0.85rem; line-height:1.1; white-space:pre-wrap; color:var(--text); }
+    .weeknames { display:grid; grid-template-columns:repeat(7,1fr); gap:6px; margin-bottom:6px; }
+    .weeknames div { text-align:center; color:var(--muted); font-size:0.85rem; }
+    /* Modal */
+    .modal-back { position:fixed; inset:0; background:rgba(0,0,0,0.6); display:none; align-items:center; justify-content:center; z-index:10000; }
+    .modal { width:420px; max-width:94%; background:linear-gradient(#0b0c0e,#101214); border-radius:10px; padding:14px; box-shadow:0 8px 40px rgba(0,0,0,0.6); }
+    .modal h3 { margin:0 0 8px 0; }
+    .modal .row { display:flex; gap:8px; margin-bottom:8px; }
+    .modal .actions { display:flex; justify-content:space-between; gap:8px; margin-top:10px; }
+    .small-muted { font-size:0.85rem; color:var(--muted); }
+    /* responsivo */
+    @media(max-width:800px){ .grid .day { min-height:72px; } }
+  </style>
 </head>
 <body>
-  <div class="main-content">
-    <h1>Escala de Funcionários</h1>
+  <div class="escala-wrap">
+    <div class="controls">
+      <label class="small-muted">Matrícula:
+        <select id="selectMatricula"></select>
+      </label>
 
-    <!-- Seleção de matrícula e período -->
-    <div style="display:flex; gap:12px; margin-bottom:16px;">
-      <select id="matriculaSelect">
-        <option value="">Selecione a matrícula</option>
-      </select>
+      <label class="small-muted">Período:
+        <select id="selectPeriodo">
+          <option value="manha">Manhã</option>
+          <option value="tarde">Tarde</option>
+          <option value="noite">Noite</option>
+        </select>
+      </label>
 
-      <select id="periodoSelect">
-        <option value="">Selecione o período</option>
-        <option value="manha">Manhã</option>
-        <option value="tarde">Tarde</option>
-        <option value="noite">Noite</option>
-      </select>
+      <label class="small-muted">Tipo:
+        <select id="selectTipo">
+          <option value="folga">Folga</option>
+          <option value="troca">Troca de horário</option>
+        </select>
+      </label>
 
-      <input type="file" id="fileInput" accept=".pdf,.xlsx,.xls">
-      <button id="uploadBtn" class="adminBtn">Enviar Escala</button>
+      <button id="btnNovo" class="primary">Novo Lançamento</button>
+
+      <div style="margin-left:auto; display:flex; gap:8px; align-items:center;">
+        <button id="prevMonth">◀</button>
+        <div id="monthLabel" class="small-muted"></div>
+        <button id="nextMonth">▶</button>
+      </div>
     </div>
 
-    <!-- Tabela de escalas -->
-    <table id="escalaTable">
-      <thead>
-        <tr>
-          <th>Matrícula</th>
-          <th>Período</th>
-          <th>Arquivo</th>
-          <th>Ações</th>
-        </tr>
-      </thead>
-      <tbody id="escalaTableBody"></tbody>
-    </table>
+    <div class="calendar">
+      <div class="cal-header">
+        <div class="small-muted">Clique em um dia para adicionar/editar</div>
+        <div id="statusInfo" class="small-muted"></div>
+      </div>
+
+      <div class="weeknames">
+        <div>Dom</div><div>Seg</div><div>Ter</div><div>Qua</div><div>Qui</div><div>Sex</div><div>Sáb</div>
+      </div>
+
+      <div id="calGrid" class="grid"></div>
+    </div>
   </div>
 
-  <!-- Firebase e script -->
-  <script type="module">
-    import { auth, db, onAuthStateChanged, collection, addDoc, getDocs, doc, deleteDoc, query, where, orderBy } from './firebaseConfig.js';
+  <!-- Modal estilizada -->
+  <div id="modalBack" class="modal-back">
+    <div class="modal" role="dialog" aria-modal="true">
+      <h3 id="modalTitle">Editar dia</h3>
+      <div class="row">
+        <label style="flex:1">Tipo:
+          <select id="modalTipo" style="width:100%">
+            <option value="folga">Folga</option>
+            <option value="troca">Troca de horário</option>
+          </select>
+        </label>
+      </div>
+      <div class="row">
+        <label style="flex:1">Descrição:
+          <textarea id="modalDesc" rows="3" style="width:100%"></textarea>
+        </label>
+      </div>
+      <div class="actions">
+        <div>
+          <button id="btnDelete" style="background:#ff4d4d;color:#fff;border:none;padding:8px;border-radius:6px;">Excluir</button>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button id="btnCancel">Cancelar</button>
+          <button id="btnSave" class="primary">Salvar</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
-    const matriculaSelect = document.getElementById('matriculaSelect');
-    const periodoSelect = document.getElementById('periodoSelect');
-    const fileInput = document.getElementById('fileInput');
-    const uploadBtn = document.getElementById('uploadBtn');
-    const escalaTableBody = document.getElementById('escalaTableBody');
-
-    let currentUser = null;
-
-    // 🔹 Carrega usuários no select
-    async function carregarUsuarios() {
-      const usersSnap = await getDocs(collection(db, 'users'));
-      matriculaSelect.innerHTML = '<option value="">Selecione a matrícula</option>';
-      usersSnap.forEach(doc => {
-        const data = doc.data();
-        const option = document.createElement('option');
-        option.value = data.matricula;
-        option.textContent = `${data.matricula} - ${data.nome}`;
-        matriculaSelect.appendChild(option);
-      });
-    }
-
-    // 🔹 Carrega escalas
-    async function carregarEscalas() {
-      const q = query(collection(db, 'escalas'), orderBy('createdAt', 'desc'));
-      const snapshot = await getDocs(q);
-      escalaTableBody.innerHTML = '';
-
-      snapshot.forEach(docSnap => {
-        const data = docSnap.data();
-        const tr = document.createElement('tr');
-
-        // Se o usuário não for admin, só mostra suas escalas
-        if (!currentUser.admin && data.matricula !== currentUser.matricula) return;
-
-        tr.innerHTML = `
-          <td>${data.matricula}</td>
-          <td>${data.periodo}</td>
-          <td><a href="${data.fileURL}" target="_blank">${data.fileName}</a></td>
-          <td>${currentUser.admin ? `<button class="delBtn">Excluir</button>` : ''}</td>
-        `;
-
-        if (currentUser.admin) {
-          tr.querySelector('.delBtn').onclick = async () => {
-            await deleteDoc(doc(db, 'escalas', docSnap.id));
-            carregarEscalas();
-          };
-        }
-
-        escalaTableBody.appendChild(tr);
-      });
-    }
-
-    // 🔹 Upload de escala
-    uploadBtn.onclick = async () => {
-      const matricula = matriculaSelect.value;
-      const periodo = periodoSelect.value;
-      const file = fileInput.files[0];
-
-      if (!matricula || !periodo || !file) {
-        alert('Selecione matrícula, período e arquivo.');
-        return;
-      }
-
-      // Salvar arquivo como URL temporária (simulação, no seu Firebase Storage você colocaria a URL real)
-      const fileURL = URL.createObjectURL(file);
-
-      await addDoc(collection(db, 'escalas'), {
-        matricula,
-        periodo,
-        fileName: file.name,
-        fileURL,
-        createdAt: new Date()
-      });
-
-      fileInput.value = '';
-      carregarEscalas();
-      alert('Escala enviada com sucesso!');
-    };
-
-    // 🔹 Autenticação
-    onAuthStateChanged(auth, async user => {
-      if (!user) return window.location.href = '../login.html';
-      currentUser = { uid: user.uid, email: user.email, matricula: user.email.split('@')[0], admin: user.email.includes('@movebuss.local') };
-      await carregarUsuarios();
-      await carregarEscalas();
-    });
-
-  </script>
+  <script type="module" src="escala.js"></script>
 </body>
 </html>
