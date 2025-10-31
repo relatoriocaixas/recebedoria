@@ -1,17 +1,18 @@
 ﻿// firebaseConfig.js
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
-import { 
-  getAuth, setPersistence, browserLocalPersistence, 
-  onAuthStateChanged, createUserWithEmailAndPassword, 
-  signInWithEmailAndPassword, signOut, updatePassword 
+import {
+  getAuth, setPersistence, browserLocalPersistence,
+  onAuthStateChanged, createUserWithEmailAndPassword,
+  signInWithEmailAndPassword, signOut, updatePassword
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
-import { 
-  getFirestore, doc, setDoc, getDoc, updateDoc, addDoc, 
-  getDocs, collection, query, where, serverTimestamp, orderBy 
+
+import {
+  getFirestore, doc, setDoc, getDoc, updateDoc, addDoc,
+  getDocs, collection, query, where, orderBy, deleteDoc
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
 // Configuração do Firebase
-export const firebaseConfig = { 
+export const firebaseConfig = {
   apiKey: "AIzaSyBWmq02P8pGbl2NmppEAIKtF9KtQ7AzTFQ",
   authDomain: "unificado-441cd.firebaseapp.com",
   projectId: "unificado-441cd",
@@ -29,9 +30,9 @@ export const db = getFirestore(app);
 // Persistência do login
 setPersistence(auth, browserLocalPersistence);
 
-// Exportar funções usadas pelo script principal
-export { 
-  onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, 
-  signOut, updatePassword, doc, setDoc, getDoc, updateDoc, addDoc, 
-  getDocs, collection, query, where, serverTimestamp, orderBy 
+// Exportar funções usadas no portal
+export {
+  onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword,
+  signOut, updatePassword, doc, setDoc, getDoc, updateDoc, addDoc,
+  getDocs, collection, query, where, orderBy, deleteDoc
 };
