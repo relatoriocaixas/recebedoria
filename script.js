@@ -1,3 +1,4 @@
+// portal/script.js
 import { auth, db } from "./firebaseConfig.js";
 import {
   onAuthStateChanged,
@@ -6,6 +7,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
+// 🔹 Elementos principais
 const sidebar = document.getElementById('sidebar');
 const logoutBtn = document.getElementById('logoutBtn');
 const changePassBtn = document.getElementById('changePassBtn');
@@ -15,6 +17,7 @@ const iframeContainer = document.getElementById('iframeContainer');
 const avisosSection = document.getElementById('avisosSection');
 const dataVigenteSpan = document.getElementById('dataVigente');
 
+// 🔹 Rotas do portal
 const ROUTES = {
   home: null,
   abastecimento: "sistemas/abastecimento/index.html",
@@ -32,23 +35,18 @@ loadingOverlay.innerHTML = `
 `;
 document.body.appendChild(loadingOverlay);
 
-function showLoading() {
-  loadingOverlay.style.display = 'flex';
-}
-function hideLoading() {
-  loadingOverlay.style.display = 'none';
-}
+function showLoading() { loadingOverlay.style.display = 'flex'; }
+function hideLoading() { loadingOverlay.style.display = 'none'; }
 
-// 🔹 Volta para tela inicial (avisos)
+// 🔹 Ir à tela inicial
 function goHome() {
-  showLoading();
+  iframeContainer.classList.remove('full');
   iframeContainer.style.display = 'none';
   avisosSection.style.display = 'block';
   sidebar.style.display = 'flex';
-  setTimeout(() => hideLoading(), 800); // transição rápida e suave
 }
 
-// 🔹 Função robusta para abrir um módulo
+// 🔹 Abre módulo com controle de token
 async function openRoute(route) {
   const src = ROUTES[route];
   if (!src) return goHome();
@@ -59,29 +57,46 @@ async function openRoute(route) {
     const user = auth.currentUser;
     if (!user) {
       alert("Sessão expirada. Faça login novamente.");
-      return (window.location.href = "login.html");
+      return window.location.href = "login.html";
     }
 
-    // 🔸 Aguarda token válido ANTES de carregar o iframe
-    const idToken = await user.getIdToken(true);
+    // 🔸 Força o Firebase a renovar token antes do iframe
+    const idToken = await new Promise((resolve, reject) => {
+      const start = Date.now();
+      const check = async () => {
+        try {
+          const t = await user.getIdToken(true);
+          if (t) return resolve(t);
+        } catch {}
+        if (Date.now() - start > 5000) reject("Timeout token");
+        else setTimeout(check, 250);
+      };
+      check();
+    });
 
-    // 🔸 Esconde os avisos e mostra área do iframe
+    // 🔸 Esconde avisos e prepara container
     avisosSection.style.display = 'none';
     iframeContainer.style.display = 'block';
     iframeContainer.classList.add('full');
-    frame.style.display = 'none'; // oculta até terminar tudo
 
-    // 🔸 Carrega o iframe somente agora
-    frame.src = src;
+    // 🔸 Recria iframe limpo
+    const newFrame = document.createElement('iframe');
+    newFrame.id = 'mainFrame';
+    newFrame.style.display = 'none';
+    iframeContainer.innerHTML = "";
+    iframeContainer.appendChild(newFrame);
 
-    await new Promise((resolve) => {
-      frame.onload = () => resolve();
+    // 🔸 Espera iframe carregar
+    await new Promise((resolve, reject) => {
+      newFrame.onload = () => resolve();
+      newFrame.onerror = () => reject("Falha ao carregar");
+      newFrame.src = src;
     });
 
-    // 🔸 Envia o token e dados de usuário ao iframe
+    // 🔸 Envia token e dados
     const parts = (user.email || '').split('@');
     const payload = {
-      type: "syncAuth",
+      type: 'syncAuth',
       usuario: {
         matricula: parts[0] || '',
         email: user.email || '',
@@ -89,20 +104,21 @@ async function openRoute(route) {
       },
       idToken
     };
-    frame.contentWindow.postMessage(payload, "*");
+    newFrame.contentWindow.postMessage(payload, '*');
 
-    // 🔸 Após envio bem-sucedido, mostra o conteúdo
-    frame.style.display = 'block';
-    hideLoading();
-
-  } catch (error) {
-    console.error("Erro ao abrir módulo:", error);
+    // 🔸 Exibe somente após sincronizar
+    setTimeout(() => {
+      newFrame.style.display = 'block';
+      hideLoading();
+    }, 500);
+  } catch (err) {
+    console.error("Erro ao abrir módulo:", err);
     alert("Erro ao carregar o sistema. Tente novamente.");
     hideLoading();
   }
 }
 
-// 🔹 Itens da barra lateral
+// 🔹 Atalhos da barra lateral
 document.querySelectorAll('.sidebar li').forEach(li => {
   li.addEventListener('click', () => {
     const t = li.dataset.target;
@@ -111,7 +127,7 @@ document.querySelectorAll('.sidebar li').forEach(li => {
   });
 });
 
-// 🔹 Atualiza a data vigente
+// 🔹 Atualiza a data
 if (dataVigenteSpan) {
   const hoje = new Date();
   const dia = String(hoje.getDate()).padStart(2, '0');
@@ -120,65 +136,92 @@ if (dataVigenteSpan) {
   dataVigenteSpan.textContent = `${dia}/${mes}/${ano}`;
 }
 
-// 🔹 Garante que o usuário exista em "users"
+// 🔹 Garante que o usuário existe no Firestore
 async function ensureUserInFirestore(user) {
   try {
     const userRef = doc(db, "users", user.uid);
-    const userSnap = await getDoc(userRef);
-    const parts = (user.email || '').split('@');
-    const matricula = parts[0] || '';
-    const domain = parts[1] || '';
-    const isAdmin = domain.toLowerCase() === 'movebuss.local';
+    const snap = await getDoc(userRef);
+    const [matricula, domain] = (user.email || '').split('@');
+    const isAdmin = (domain || '').toLowerCase() === 'movebuss.local';
 
-    if (!userSnap.exists()) {
+    if (!snap.exists()) {
       await setDoc(userRef, {
         uid: user.uid,
         email: user.email || '',
-        matricula,
-        nome: user.displayName || matricula,
+        matricula: matricula || '',
+        nome: user.displayName || matricula || '',
         admin: isAdmin,
         createdAt: new Date()
       });
-      console.log("Usuário adicionado à coleção 'users'.");
     } else {
-      const existing = userSnap.data();
+      const existing = snap.data();
       if (existing.admin !== isAdmin) {
         await setDoc(userRef, { ...existing, admin: isAdmin }, { merge: true });
-        console.log("Campo 'admin' atualizado conforme domínio.");
       }
     }
   } catch (e) {
-    console.error("Erro ao salvar usuário em 'users':", e);
+    console.error("Erro Firestore:", e);
   }
 }
 
-// 🔹 Estado de autenticação principal
+// 🔹 Controle de login com sincronização e proteção
 onAuthStateChanged(auth, async (user) => {
   showLoading();
+
   if (!user) {
-    window.location.href = 'login.html';
-  } else {
-    sidebar.classList.remove('hidden');
+    hideLoading();
+    return window.location.href = 'login.html';
+  }
 
-    const parts = (user.email || '').split('@');
-    sidebarBadge.textContent = parts[0];
-
-    sidebar.addEventListener('mouseenter', () => {
-      sidebarBadge.textContent = (user.displayName || 'Usuário') + ' • ' + parts[0];
-    });
-    sidebar.addEventListener('mouseleave', () => {
-      sidebarBadge.textContent = parts[0];
-    });
-
+  try {
     await ensureUserInFirestore(user);
 
-    // 🔸 Após login, abre Home com transição leve
-    setTimeout(() => {
-      goHome();
-      hideLoading();
-    }, 800);
+    // Mostra interface
+    sidebar.classList.remove('hidden');
+    const [matricula] = (user.email || '').split('@');
+    sidebarBadge.textContent = matricula;
+
+    sidebar.addEventListener('mouseenter', () => {
+      sidebarBadge.textContent = (user.displayName || 'Usuário') + ' • ' + matricula;
+    });
+    sidebar.addEventListener('mouseleave', () => {
+      sidebarBadge.textContent = matricula;
+    });
+
+    // Espera token e envia ao iframe inicial (se houver)
+    await sendAuthToIframe();
+
+    goHome();
+    hideLoading();
+  } catch (err) {
+    console.error("Erro ao inicializar usuário:", err);
+    hideLoading();
   }
 });
+
+// 🔹 Envio seguro de autenticação
+async function sendAuthToIframe() {
+  try {
+    const user = auth.currentUser;
+    if (!user) return;
+    const [matricula] = (user.email || '').split('@');
+    const idToken = await user.getIdToken();
+    const payload = {
+      type: 'syncAuth',
+      usuario: {
+        matricula: matricula || '',
+        email: user.email || '',
+        nome: user.displayName || ''
+      },
+      idToken
+    };
+    if (frame && frame.contentWindow) {
+      frame.contentWindow.postMessage(payload, '*');
+    }
+  } catch (e) {
+    console.warn('sendAuthToIframe error', e);
+  }
+}
 
 // 🔹 Botão sair
 logoutBtn.addEventListener('click', async () => {
@@ -186,7 +229,7 @@ logoutBtn.addEventListener('click', async () => {
   window.location.href = 'login.html';
 });
 
-// 🔹 Botão alterar senha
+// 🔹 Alterar senha
 changePassBtn.addEventListener('click', async () => {
   const user = auth.currentUser;
   if (!user) return alert('Usuário não autenticado.');
@@ -200,11 +243,11 @@ changePassBtn.addEventListener('click', async () => {
   } catch (e) {
     console.error('Erro ao alterar senha:', e);
     if (e.code === 'auth/requires-recent-login') {
-      alert('Por segurança, faça login novamente antes de alterar a senha.');
+      alert('Por segurança, faça login novamente.');
       await signOut(auth);
       window.location.href = 'login.html';
     } else {
-      alert('Erro ao alterar senha: ' + (e?.message || e));
+      alert('Erro: ' + (e?.message || e));
     }
   }
 });

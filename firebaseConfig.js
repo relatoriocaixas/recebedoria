@@ -1,35 +1,17 @@
 // firebaseConfig.js
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
-import {
-  getAuth,
-  setPersistence,
-  browserLocalPersistence,
-  onAuthStateChanged,
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signOut,
-  updatePassword
+import { 
+  getAuth, setPersistence, browserLocalPersistence, 
+  onAuthStateChanged, createUserWithEmailAndPassword, 
+  signInWithEmailAndPassword, signOut, updatePassword 
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
-import {
-  getFirestore,
-  doc,
-  setDoc,
-  getDoc,
-  updateDoc,
-  addDoc,
-  getDocs,
-  collection,
-  query,
-  where,
-  serverTimestamp,
-  orderBy,
-  deleteDoc
+import { 
+  getFirestore, doc, setDoc, getDoc, updateDoc, addDoc, 
+  getDocs, collection, query, where, serverTimestamp, orderBy 
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
-// ======================================================
-// ConfiguraÃ§Ã£o Firebase
-// ======================================================
-export const firebaseConfig = {
+// Configuração do Firebase
+export const firebaseConfig = { 
   apiKey: "AIzaSyBWmq02P8pGbl2NmppEAIKtF9KtQ7AzTFQ",
   authDomain: "unificado-441cd.firebaseapp.com",
   projectId: "unificado-441cd",
@@ -44,28 +26,12 @@ export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 
-// PersistÃªncia de login
+// Persistência do login
 setPersistence(auth, browserLocalPersistence);
 
-// ======================================================
-// ExportaÃ§Ãµes para uso em outros mÃ³dulos
-// ======================================================
-export {
-  onAuthStateChanged,
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signOut,
-  updatePassword,
-  doc,
-  setDoc,
-  getDoc,
-  updateDoc,
-  addDoc,
-  getDocs,
-  collection,
-  query,
-  where,
-  serverTimestamp,
-  orderBy,
-  deleteDoc
+// Exportar funções que o app.js usa
+export { 
+  onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, 
+  signOut, updatePassword, doc, setDoc, getDoc, updateDoc, addDoc, 
+  getDocs, collection, query, where, serverTimestamp, orderBy 
 };
