@@ -1,0 +1,137 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Escala - Portal Unificado</title>
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="escala.js"></script>
+  <style>
+    /* Garantir que o background e layout sejam iguais ao portal */
+    body {
+      background: #f5f5f5;
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .escala-container {
+      max-width: 900px;
+      margin: 0 auto;
+      background: #fff;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    .form-group {
+      margin-bottom: 15px;
+      display: flex;
+      flex-direction: column;
+    }
+    label {
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+    select, input[type="file"], textarea, button {
+      padding: 8px;
+      font-size: 14px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+    textarea {
+      min-height: 80px;
+    }
+    button {
+      cursor: pointer;
+      background: #007bff;
+      color: #fff;
+      border: none;
+      margin-top: 10px;
+      transition: background 0.2s;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    table, th, td {
+      border: 1px solid #ddd;
+    }
+    th, td {
+      padding: 10px;
+      text-align: left;
+    }
+    th {
+      background: #f0f0f0;
+    }
+    .deleteBtn {
+      background: #dc3545;
+    }
+    .deleteBtn:hover {
+      background: #a71d2a;
+    }
+    #status {
+      margin-top: 10px;
+      font-weight: bold;
+      color: green;
+    }
+  </style>
+</head>
+<body>
+  <div class="escala-container">
+    <h1>Gestão de Escalas</h1>
+
+    <div class="form-group">
+      <label for="matriculaSel">Matrícula:</label>
+      <select id="matriculaSel">
+        <!-- Populado pelo JS -->
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label for="periodoSel">Período:</label>
+      <select id="periodoSel">
+        <option value="">Selecione</option>
+        <option value="manha">Manhã</option>
+        <option value="tarde">Tarde</option>
+        <option value="noite">Noite</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label for="escalaTexto">Texto da Escala:</label>
+      <textarea id="escalaTexto" placeholder="Digite aqui o trecho da escala..."></textarea>
+    </div>
+
+    <div class="form-group">
+      <label for="fileInput">Arquivo PDF/Excel (opcional):</label>
+      <input type="file" id="fileInput" accept=".pdf,.xls,.xlsx">
+    </div>
+
+    <button id="salvarBtn">Salvar Escala</button>
+    <button id="excluirBtn">Excluir Escala</button>
+
+    <div id="status"></div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Matrícula</th>
+          <th>Período</th>
+          <th>Arquivo</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody id="listaEscalas">
+        <!-- Populado pelo JS -->
+      </tbody>
+    </table>
+  </div>
+</body>
+</html>

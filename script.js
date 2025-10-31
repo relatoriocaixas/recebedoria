@@ -16,12 +16,14 @@ const iframeContainer = document.getElementById('iframeContainer');
 const avisosSection = document.getElementById('avisosSection');
 const dataVigenteSpan = document.getElementById('dataVigente');
 
+// 🔹 ROTAS
 const ROUTES = {
   home: null,
   abastecimento: "sistemas/abastecimento/index.html",
   emprestimo: "sistemas/emprestimo/index.html",
   relatorios: "sistemas/emprestimo/emprestimocartao-main/relatorio.html",
-  diferencas: "sistemas/diferencas/index.html"
+  diferencas: "sistemas/diferencas/index.html",
+  escala: "sistemas/escala/escala.html" // 🔹 Nova rota Escala
 };
 
 // 🔹 Tela de carregamento
@@ -65,6 +67,14 @@ function openRoute(route) {
 
   frame.src = src;
 }
+
+// 🔹 Adiciona Escala na barra lateral dinamicamente
+const escalaLi = document.createElement('li');
+escalaLi.dataset.target = 'escala';
+escalaLi.innerHTML = "📅 <span class='label'>Escala</span>";
+sidebar.querySelector('ul').appendChild(escalaLi);
+
+escalaLi.addEventListener('click', () => openRoute('escala'));
 
 // 🔹 Atalhos da barra lateral
 document.querySelectorAll('.sidebar li').forEach(li => {
@@ -111,6 +121,8 @@ async function ensureUserInFirestore(user) {
         console.log("Campo 'admin' atualizado conforme domínio.");
       }
     }
+
+    return { matricula, isAdmin }; // retorna info do usuário
   } catch (e) {
     console.error("Erro ao salvar usuário em 'users':", e);
     throw e;
@@ -128,7 +140,6 @@ onAuthStateChanged(auth, async (user) => {
   showLoading();
 
   if (!user) {
-    // Espera um pouco para evitar falsos negativos
     setTimeout(async () => {
       const currentUser = auth.currentUser;
       if (!currentUser && !authChecked) {
@@ -142,10 +153,9 @@ onAuthStateChanged(auth, async (user) => {
 
   try {
     authChecked = true;
-    await ensureUserInFirestore(user);
+    const { matricula, isAdmin } = await ensureUserInFirestore(user);
 
     sidebar.classList.remove('hidden');
-    const [matricula] = (user.email || '').split('@');
     sidebarBadge.textContent = matricula;
 
     sidebar.addEventListener('mouseenter', () => {
@@ -171,19 +181,20 @@ onAuthStateChanged(auth, async (user) => {
       return;
     }
 
-    // Depois de 3 tentativas falhas, mantém tela de loading (sem piscar)
     console.error("Erro persistente — mantendo tela de carregamento.");
     showLoading();
   }
 });
 
-// 🔹 Envio seguro do auth
+// 🔹 Envio seguro do auth para iframes (Escala, etc)
 async function sendAuthToIframe() {
   try {
     const user = auth.currentUser;
     if (!user) return;
+
     const parts = (user.email || '').split('@');
     const idToken = await user.getIdToken();
+
     const payload = {
       type: 'syncAuth',
       usuario: {
@@ -191,8 +202,10 @@ async function sendAuthToIframe() {
         email: user.email || '',
         nome: user.displayName || ''
       },
+      admin: (parts[1].toLowerCase() === 'movebuss.local'),
       idToken
     };
+
     if (frame && frame.contentWindow) {
       frame.contentWindow.postMessage(payload, '*');
     }
