@@ -1,15 +1,19 @@
-﻿// escala.js — versão compatível com o portal
-import { 
-  db, auth,
-  collection, getDocs, setDoc, deleteDoc, doc 
-} from "../../firebaseConfig.js";
+﻿// escala.js — versão final corrigida
+import { db, auth } from "../../firebaseConfig.js";
+
+import {
+  collection,
+  getDocs,
+  setDoc,
+  deleteDoc,
+  doc
+} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
 document.addEventListener("DOMContentLoaded", () => {
   console.log("[escala] Iniciado");
 
   const selectMatricula = document.getElementById("selectMatricula");
   const selectPeriodo = document.getElementById("selectPeriodo");
-  const selectTipo = document.getElementById("selectTipo");
   const calGrid = document.getElementById("calGrid");
   const monthLabel = document.getElementById("monthLabel");
   const btnNovo = document.getElementById("btnNovo");
@@ -74,7 +78,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const primeiroDia = new Date(ano, mes, 1);
     const ultimoDia = new Date(ano, mes + 1, 0);
 
-    monthLabel.textContent = primeiroDia.toLocaleString("pt-BR", { month: "long", year: "numeric" });
+    monthLabel.textContent = primeiroDia.toLocaleString("pt-BR", {
+      month: "long",
+      year: "numeric"
+    });
+
     const matricula = selectMatricula.value;
     if (!matricula) return;
 

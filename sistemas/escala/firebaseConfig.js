@@ -1,17 +1,8 @@
 ﻿// firebaseConfig.js
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
-import {
-  getAuth, setPersistence, browserLocalPersistence,
-  onAuthStateChanged, createUserWithEmailAndPassword,
-  signInWithEmailAndPassword, signOut, updatePassword
-} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+import { getAuth, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+import { getFirestore } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
-import {
-  getFirestore, doc, setDoc, getDoc, updateDoc, addDoc,
-  getDocs, collection, query, where, orderBy, deleteDoc
-} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
-
-// Configuração do Firebase
 export const firebaseConfig = {
   apiKey: "AIzaSyBWmq02P8pGbl2NmppEAIKtF9KtQ7AzTFQ",
   authDomain: "unificado-441cd.firebaseapp.com",
@@ -22,17 +13,9 @@ export const firebaseConfig = {
   measurementId: "G-6GQX395J9C"
 };
 
-// Inicializa Firebase
 export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 
-// Persistência do login
+// Mantém persistência local de login
 setPersistence(auth, browserLocalPersistence);
-
-// Exportar funções usadas no portal
-export {
-  onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword,
-  signOut, updatePassword, doc, setDoc, getDoc, updateDoc, addDoc,
-  getDocs, collection, query, where, orderBy, deleteDoc
-};
