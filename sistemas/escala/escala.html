@@ -1,162 +1,65 @@
-﻿import { db, auth } from "../../firebaseConfig.js";
-import {
-  collection,
-  getDocs,
-  addDoc,
-  query,
-  orderBy,
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+﻿<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Escala — Portal Unificado</title>
+<link rel="stylesheet" href="../../style.css">
+<style>
+  .escala-wrap { padding:18px; color:var(--text); height:100%; display:flex; flex-direction:column; gap:12px; visibility:hidden; }
+  .controls { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+  select,input,button,textarea { background: rgba(20,20,20,0.6); border:1px solid rgba(255,255,255,0.04); color:var(--text); padding:8px; border-radius:6px; }
+  button.primary { background:#4da6ff; color:#fff; border:none; }
+  .calendar { background: rgba(10,10,10,0.45); border-radius:8px; padding:12px; flex:1; overflow:auto; margin-top:12px; }
+  .cal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+  .grid { display:grid; grid-template-columns:repeat(7,1fr); gap:6px; }
+  .grid .day { min-height:90px; background:rgba(255,255,255,0.02); border-radius:6px; padding:6px; position:relative; display:flex; flex-direction:column; gap:2px; cursor:pointer; }
+  .grid .day .num { position:absolute; top:6px; right:8px; font-weight:700; color:var(--muted); }
+  .day .desc { font-size:0.75rem; line-height:1; white-space:nowrap; color:#fff; padding:2px 4px; border-radius:4px; overflow:hidden; text-overflow:ellipsis; }
+  .weeknames { display:grid; grid-template-columns:repeat(7,1fr); gap:6px; margin-bottom:6px; }
+  .weeknames div { text-align:center; color:var(--muted); font-size:0.85rem; }
+  @media(max-width:800px){ .grid .day { min-height:72px; } }
+</style>
+</head>
+<body>
+<div class="escala-wrap">
+  <div class="controls">
+    <label>Matrícula:
+      <select id="selectMatricula"></select>
+    </label>
+    <label>Período:
+      <select id="selectPeriodo">
+        <option value="manha">Manhã</option>
+        <option value="tarde">Tarde</option>
+        <option value="noite">Noite</option>
+      </select>
+    </label>
+    <label>Tipo:
+      <select id="selectTipo">
+        <option value="folga">Folga</option>
+        <option value="troca">Troca de horário</option>
+      </select>
+    </label>
+    <label>Dia:
+      <input type="date" id="inputDia"/>
+    </label>
+    <button id="btnSalvar" class="primary">Salvar Folga</button>
 
-document.addEventListener("DOMContentLoaded", async () => {
-  console.log("[escala] Iniciando módulo...");
+    <div style="margin-left:auto; display:flex; gap:8px; align-items:center;">
+      <button id="prevMonth">◀</button>
+      <div id="monthLabel" class="small-muted"></div>
+      <button id="nextMonth">▶</button>
+    </div>
+  </div>
 
-  const wrap = document.querySelector(".escala-wrap");
-  const calGrid = document.getElementById("calGrid");
-  const monthLabel = document.getElementById("monthLabel");
-  const selectMatricula = document.getElementById("selectMatricula");
-  const selectPeriodo = document.getElementById("selectPeriodo");
-  const selectTipo = document.getElementById("selectTipo");
-  const inputDia = document.getElementById("inputDia");
-  const btnSalvar = document.getElementById("btnSalvar");
+  <div class="calendar">
+    <div class="weeknames">
+      <div>Dom</div><div>Seg</div><div>Ter</div><div>Qua</div><div>Qui</div><div>Sex</div><div>Sáb</div>
+    </div>
+    <div id="calGrid" class="grid"></div>
+  </div>
+</div>
 
-  let currentMonth = new Date();
-  let folgas = [];
-  let matriculas = [];
-
-  // Espera o usuário logar
-  auth.onAuthStateChanged(async (user) => {
-    if (!user) return console.warn("[escala] Usuário não autenticado.");
-
-    console.log("[escala] Usuário autenticado:", user.uid);
-
-    await carregarMatriculas();
-    await carregarFolgas();
-
-    renderCalendar();
-    wrap.style.visibility = "visible";
-  });
-
-  // === Carregar matrículas do Firestore ===
-  async function carregarMatriculas() {
-    try {
-      const q = query(collection(db, "usuarios"), orderBy("matricula"));
-      const snap = await getDocs(q);
-      selectMatricula.innerHTML = `<option value="">Selecione...</option>`;
-      matriculas = [];
-
-      snap.forEach((doc) => {
-        const data = doc.data();
-        if (data.matricula) {
-          matriculas.push(data.matricula);
-          const opt = document.createElement("option");
-          opt.value = data.matricula;
-          opt.textContent = data.matricula;
-          selectMatricula.appendChild(opt);
-        }
-      });
-
-      console.log("[escala] Matrículas carregadas:", matriculas);
-    } catch (err) {
-      console.error("[escala] Erro ao carregar matrículas:", err);
-    }
-  }
-
-  // === Carregar folgas do Firestore ===
-  async function carregarFolgas() {
-    try {
-      const snap = await getDocs(collection(db, "folgas"));
-      folgas = [];
-      snap.forEach((doc) => folgas.push({ id: doc.id, ...doc.data() }));
-      console.log("[escala] Folgas carregadas:", folgas);
-    } catch (err) {
-      console.error("[escala] Erro ao carregar folgas:", err);
-    }
-  }
-
-  // === Renderizar calendário ===
-  function renderCalendar() {
-    calGrid.innerHTML = "";
-    const ano = currentMonth.getFullYear();
-    const mes = currentMonth.getMonth();
-    const primeiroDia = new Date(ano, mes, 1);
-    const ultimoDia = new Date(ano, mes + 1, 0);
-    const offset = primeiroDia.getDay();
-    const diasMes = ultimoDia.getDate();
-
-    monthLabel.textContent = currentMonth.toLocaleDateString("pt-BR", {
-      month: "long",
-      year: "numeric",
-    });
-
-    for (let i = 0; i < offset; i++) {
-      const empty = document.createElement("div");
-      calGrid.appendChild(empty);
-    }
-
-    for (let dia = 1; dia <= diasMes; dia++) {
-      const cell = document.createElement("div");
-      cell.className = "day";
-      cell.innerHTML = `<div class="num">${dia}</div>`;
-      const dataISO = new Date(ano, mes, dia).toISOString().split("T")[0];
-
-      const folgasDoDia = folgas.filter((f) => f.data === dataISO);
-      folgasDoDia.forEach((f) => {
-        const tag = document.createElement("div");
-        tag.className = "desc";
-        tag.textContent = `${f.matricula} (${f.tipo})`;
-        tag.style.background = gerarCorPorMatricula(f.matricula);
-        cell.appendChild(tag);
-      });
-
-      calGrid.appendChild(cell);
-    }
-  }
-
-  // === Salvar folga ===
-  btnSalvar.addEventListener("click", async () => {
-    const matricula = selectMatricula.value;
-    const periodo = selectPeriodo.value;
-    const tipo = selectTipo.value;
-    const data = inputDia.value;
-
-    if (!matricula || !data) {
-      alert("Selecione matrícula e dia antes de salvar!");
-      return;
-    }
-
-    try {
-      await addDoc(collection(db, "folgas"), {
-        matricula,
-        periodo,
-        tipo,
-        data,
-        criadoEm: new Date().toISOString(),
-      });
-
-      alert("Folga registrada!");
-      await carregarFolgas();
-      renderCalendar();
-    } catch (err) {
-      console.error("Erro ao salvar folga:", err);
-      alert("Erro ao salvar folga!");
-    }
-  });
-
-  // === Navegação de meses ===
-  document.getElementById("prevMonth").addEventListener("click", () => {
-    currentMonth.setMonth(currentMonth.getMonth() - 1);
-    renderCalendar();
-  });
-  document.getElementById("nextMonth").addEventListener("click", () => {
-    currentMonth.setMonth(currentMonth.getMonth() + 1);
-    renderCalendar();
-  });
-
-  // === Gera cor única por matrícula ===
-  function gerarCorPorMatricula(mat) {
-    const hash = Array.from(mat)
-      .reduce((acc, ch) => acc + ch.charCodeAt(0), 0)
-      .toString(16);
-    return `#${hash.slice(0, 6)}`;
-  }
-});
+<script type="module" src="escala.js"></script>
+</body>
+</html>
