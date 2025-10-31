@@ -1,12 +1,7 @@
 ﻿// escala.js
 import { auth, db } from '../../firebaseConfig.js';
 import {
-  onAuthStateChanged
-} from '../../firebaseConfig.js'; // onAuthStateChanged exported by your firebaseConfig
-
-// Firestore helpers (estas funções foram exportadas no firebaseConfig que você mostrou)
-import {
-  doc, getDoc, setDoc, getDocs, collection, query, where, orderBy, updateDoc
+  onAuthStateChanged, doc, getDoc, setDoc, getDocs, collection, query, where, updateDoc
 } from '../../firebaseConfig.js';
 
 // ----------------- UI refs -----------------
@@ -42,18 +37,21 @@ const pad = (n) => String(n).padStart(2, '0');
 const isoDate = (y, m, d) => `${y}-${pad(m)}-${pad(d)}`;
 const docIdFor = (mat, periodo, y, m) => `${mat}_${periodo}_${y}-${pad(m)}`;
 
-// ----------------- Load users (populate select) -----------------
+// ----------------- Load users -----------------
 async function carregarUsuarios() {
   selectMatricula.innerHTML = '<option value="">Carregando...</option>';
   usersList = [];
   try {
-    const snaps = await getDocs(query(collection(db, 'users'), orderBy('matricula')));
+    const snaps = await getDocs(collection(db, 'users'));
     snaps.forEach(s => {
       const d = s.data();
       if (d && d.matricula) usersList.push({ matricula: d.matricula, nome: d.nome || d.matricula });
     });
-    // popular select (admins veem tudo, usuarios só veem a propria matricula que definiremos depois)
     selectMatricula.innerHTML = '';
+    if (usersList.length === 0) {
+      const fallbackMat = currentUserDoc?.matricula || (currentUser?.email?.split('@')[0]) || '0000';
+      usersList.push({ matricula: fallbackMat, nome: fallbackMat });
+    }
     usersList.forEach(u => {
       const opt = document.createElement('option');
       opt.value = u.matricula;
@@ -62,11 +60,11 @@ async function carregarUsuarios() {
     });
   } catch (e) {
     console.error('Erro ao carregar usuários:', e);
-    selectMatricula.innerHTML = '<option value="">Erro</option>';
+    selectMatricula.innerHTML = '<option value="">Erro ao carregar</option>';
   }
 }
 
-// ----------------- Calendar rendering -----------------
+// ----------------- Calendar -----------------
 function setView(year, month) {
   viewYear = year; viewMonth = month;
   monthLabel.textContent = `${viewYear}-${pad(viewMonth + 1)}`;
@@ -74,7 +72,7 @@ function setView(year, month) {
 }
 
 function firstDayOfMonth(year, month) {
-  return new Date(year, month, 1).getDay(); // 0..6 (Sun..Sat)
+  return new Date(year, month, 1).getDay(); // 0..6 (Dom..Sáb)
 }
 function daysInMonth(year, month) {
   return new Date(year, month + 1, 0).getDate();
@@ -82,43 +80,43 @@ function daysInMonth(year, month) {
 
 async function renderCalendar() {
   calGrid.innerHTML = '';
-  // determine document (matricula & periodo)
+
   const matricula = selectMatricula.value || currentUserDoc?.matricula;
-  const periodo = selectPeriodo.value;
-  if (!matricula) {
-    calGrid.innerHTML = '<div class="small-muted">Selecione uma matrícula.</div>';
-    return;
-  }
+  const periodo = selectPeriodo.value || 'manha';
 
-  statusInfo.textContent = `Mostrando: ${matricula} — ${periodo}`;
+  statusInfo.textContent = matricula
+    ? `Mostrando: ${matricula} — ${periodo}`
+    : 'Nenhuma matrícula selecionada';
 
-  // load the doc for this month
-  const id = docIdFor(matricula, periodo, viewYear, viewMonth + 1);
-  editingDocId = id;
-  let diasObj = {};
-  try {
-    const dref = doc(db, 'escalas', id);
-    const snap = await getDoc(dref);
-    if (snap.exists()) {
-      const data = snap.data();
-      diasObj = data.dias || {};
-    }
-  } catch (e) {
-    console.error('Erro ao carregar escalas:', e);
-  }
-
-  // build grid: include leading blanks for first weekday
+  // sempre mostra calendário
   const firstWeekday = firstDayOfMonth(viewYear, viewMonth);
   const totalDays = daysInMonth(viewYear, viewMonth);
 
-  // add blanks
+  // adiciona espaços iniciais
   for (let i = 0; i < firstWeekday; i++) {
-    const blank = document.createElement('div'); blank.className = 'day';
-    blank.innerHTML = '';
+    const blank = document.createElement('div');
+    blank.className = 'day';
     calGrid.appendChild(blank);
   }
 
-  // add days
+  // tenta carregar dias se tiver matrícula
+  let diasObj = {};
+  if (matricula) {
+    const id = docIdFor(matricula, periodo, viewYear, viewMonth + 1);
+    editingDocId = id;
+    try {
+      const dref = doc(db, 'escalas', id);
+      const snap = await getDoc(dref);
+      if (snap.exists()) {
+        const data = snap.data();
+        diasObj = data.dias || {};
+      }
+    } catch (e) {
+      console.error('Erro ao carregar escalas:', e);
+    }
+  }
+
+  // monta dias
   for (let d = 1; d <= totalDays; d++) {
     const dateIso = isoDate(viewYear, viewMonth + 1, d);
     const dayEl = document.createElement('div');
@@ -132,25 +130,26 @@ async function renderCalendar() {
       dayEl.innerHTML = `<div class="num">${d}</div>`;
     }
 
-    // click handler: open modal if allowed
+    // clique no dia
     dayEl.addEventListener('click', () => {
-      // only admins can edit other matriculas; non-admins only their own matricula
-      const selectedMat = selectMatricula.value || currentUserDoc?.matricula;
-      if (!isAdmin && selectedMat !== currentUserDoc?.matricula) {
-        alert('Você só pode ver a sua própria escala.');
+      if (!matricula) {
+        alert('Selecione uma matrícula primeiro.');
         return;
       }
-      openModal(dateIso, selectedMat, periodo, info);
+      if (!isAdmin && matricula !== currentUserDoc?.matricula) {
+        alert('Você só pode visualizar sua própria escala.');
+        return;
+      }
+      openModal(dateIso, matricula, periodo, info);
     });
 
     calGrid.appendChild(dayEl);
   }
 }
 
-// simple sanitize (keeps newlines)
 function sanitize(text) {
   if (!text) return '';
-  return text.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
+  return text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 }
 
 // ----------------- Modal -----------------
@@ -162,7 +161,6 @@ function openModal(dateIso, matricula, periodo, info) {
   modalDesc.value = info?.descricao || '';
   modalBack.style.display = 'flex';
   document.getElementById('modalTitle').textContent = `Editar ${dateIso} — ${matricula} (${periodo})`;
-  // enable/disable delete depending if exists
   btnDelete.style.display = info ? 'inline-block' : 'none';
 }
 
@@ -177,89 +175,77 @@ btnDelete.onclick = async () => {
   try {
     const dref = doc(db, 'escalas', editingDocId);
     const snap = await getDoc(dref);
-    if (!snap.exists()) {
-      alert('Nada a remover.');
-      modalBack.style.display = 'none';
-      return;
-    }
+    if (!snap.exists()) return;
     const data = snap.data() || {};
     const dias = data.dias || {};
     delete dias[editingDate];
-    // if no dias left, remove doc content (set empty dias)
     await setDoc(dref, { dias }, { merge: true });
     modalBack.style.display = 'none';
     renderCalendar();
   } catch (e) {
     console.error('Erro ao excluir dia:', e);
-    alert('Erro ao excluir. Veja console.');
   }
 };
 
 btnSave.onclick = async () => {
-  if (!editingDate || !editingDocId || !editingMatricula) return;
+  if (!editingDate || !editingMatricula) return;
   const tipo = modalTipo.value;
   const descricao = modalDesc.value.trim();
 
   try {
-    const dref = doc(db, 'escalas', editingDocId);
+    const id = docIdFor(editingMatricula, editingPeriodo, viewYear, viewMonth + 1);
+    const dref = doc(db, 'escalas', id);
     const snap = await getDoc(dref);
-    const data = snap.exists() ? snap.data() : { matricula: editingMatricula, periodo: editingPeriodo, anoMes: `${viewYear}-${pad(viewMonth+1)}`, dias: {} };
+    const data = snap.exists()
+      ? snap.data()
+      : { matricula: editingMatricula, periodo: editingPeriodo, anoMes: `${viewYear}-${pad(viewMonth + 1)}`, dias: {} };
     data.dias = data.dias || {};
     data.dias[editingDate] = { tipo, descricao, updatedAt: new Date(), updatedBy: currentUser.uid };
-    // save (merge)
     await setDoc(dref, data, { merge: true });
     modalBack.style.display = 'none';
     renderCalendar();
   } catch (e) {
     console.error('Erro ao salvar dia:', e);
-    alert('Erro ao salvar. Veja console.');
   }
 };
 
-// ----------------- Auth & boot -----------------
+// ----------------- Auth -----------------
 onAuthStateChanged(auth, async (user) => {
   if (!user) {
-    alert('Usuário não autenticado. Faça login no portal.');
+    alert('Usuário não autenticado.');
     return;
   }
   currentUser = user;
 
-  // load user doc to check admin and matricula
   try {
     const uref = doc(db, 'users', user.uid);
     const usnap = await getDoc(uref);
     if (!usnap.exists()) {
-      // create baseline if missing
-      const matDefault = (user.email || '').split('@')[0] || 'unknown';
-      await setDoc(uref, { uid: user.uid, email: user.email || '', matricula: matDefault, nome: user.displayName || matDefault, admin: false, createdAt: new Date() });
+      const mat = (user.email || '').split('@')[0];
+      await setDoc(uref, {
+        uid: user.uid, email: user.email, matricula: mat, nome: mat, admin: false, createdAt: new Date()
+      });
     }
-    const userdata = (await getDoc(uref)).data();
-    currentUserDoc = userdata;
-    isAdmin = userdata?.admin === true;
+    const data = (await getDoc(uref)).data();
+    currentUserDoc = data;
+    isAdmin = data?.admin === true;
   } catch (e) {
     console.error('Erro ao carregar perfil:', e);
-    alert('Erro ao carregar perfil. Veja console.');
-    return;
   }
 
-  // carregar usuarios para select
   await carregarUsuarios();
 
-  // se não for admin, pre-seleciona a matricula do usuário e desabilita o select
   if (!isAdmin) {
     selectMatricula.value = currentUserDoc.matricula;
     selectMatricula.disabled = true;
   } else {
-    // admin: se houver ao menos uma matricula, pre-seleciona a primeira
     if (selectMatricula.options.length) selectMatricula.selectedIndex = 0;
     selectMatricula.disabled = false;
   }
 
-  // iniciar view com mês atual
   const hoje = new Date();
   setView(hoje.getFullYear(), hoje.getMonth());
 
-  // add listeners
   prevMonth.onclick = () => {
     const d = new Date(viewYear, viewMonth - 1, 1);
     setView(d.getFullYear(), d.getMonth());
@@ -269,26 +255,18 @@ onAuthStateChanged(auth, async (user) => {
     setView(d.getFullYear(), d.getMonth());
   };
 
-  // when select changes, re-render
   selectMatricula.addEventListener('change', renderCalendar);
   selectPeriodo.addEventListener('change', renderCalendar);
 
-  // New quick-add: choose a date from prompt? We'll open modal for today
   btnNovo.addEventListener('click', () => {
     const matricula = selectMatricula.value || currentUserDoc.matricula;
     const periodo = selectPeriodo.value;
-    const hojeIso = isoDate(new Date().getFullYear(), new Date().getMonth()+1, new Date().getDate());
+    const hoje = new Date();
+    const hojeIso = isoDate(hoje.getFullYear(), hoje.getMonth() + 1, hoje.getDate());
     openModal(hojeIso, matricula, periodo, null);
   });
 
-  // close modal on backdrop click
   modalBack.addEventListener('click', (e) => {
     if (e.target === modalBack) modalBack.style.display = 'none';
   });
 });
-
-// utility setDoc wrapper (we import setDoc directly from firebaseConfig export)
-async function setDoc(ref, data, opts = {}) {
-  // The firebaseConfig's setDoc is the firestore one; call it directly
-  return await (await import('../../firebaseConfig.js')).setDoc(ref, data, opts);
-}
