@@ -29,24 +29,9 @@ body {
   filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.3));
 }
 
-/* Título Portal Recebedoria com efeito de luz animada */
 h2 {
   margin-bottom: 25px;
-  font-size: 2.2rem;
-  font-weight: 900;
-  color: #c0c0c0; /* prata base */
-  background: linear-gradient(90deg, #c0c0c0, #ffffff, #c0c0c0);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  text-shadow: 2px 2px 4px #111;
-  background-size: 200% 100%;
-  animation: luzLetra 3s linear infinite;
-}
-
-@keyframes luzLetra {
-  0% { background-position: 200% 0; }
-  50% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  color: #00ff88;
 }
 
 /* Inputs */
