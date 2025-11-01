@@ -1,120 +1,129 @@
-/* ===== Background ===== */
+/* Fundo escuro com radial suave */
 body {
-  margin: 0;
-  font-family: 'Arial', sans-serif;
-  background: radial-gradient(circle at top, #0f2027, #203a43, #2c5364);
-  color: #fff;
-  height: 100vh;
+  font-family: 'Inter', sans-serif;
+  background: radial-gradient(circle at center, #111 0%, #000 100%);
   display: flex;
-  justify-content: center;
   align-items: center;
-}
-
-/* ===== Container ===== */
-.login-container {
-  background: rgba(0,0,0,0.65);
-  backdrop-filter: blur(6px);
-  padding: 40px 30px;
-  border-radius: 16px;
-  text-align: center;
-  width: 360px;
-  box-shadow: 0 0 30px rgba(0,0,0,0.5);
-  position: relative;
-}
-
-/* ===== Logo ===== */
-.login-logo {
-  max-width: 120px;
-  margin-bottom: 20px;
-}
-
-/* ===== 3D Title with Light Animation ===== */
-.form-title {
-  font-size: 2.4rem;
-  font-weight: 900;
+  justify-content: center;
+  height: 100vh;
+  margin: 0;
   color: #fff;
-  letter-spacing: 1px;
-  margin-bottom: 25px;
+  flex-direction: column;
+}
+
+.login-container {
+  width: 340px;
+  padding: 40px;
+  border-radius: 16px;
+  background: rgba(20, 20, 20, 0.45);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 0 25px rgba(0, 255, 100, 0.3);
+  text-align: center;
   position: relative;
-  text-shadow: 2px 2px 0 #111, 4px 4px 0 #222, 6px 6px 0 #333, 0 0 8px #fff;
-  background: linear-gradient(90deg, #fffb00, #ff00ff, #00ffff, #fffb00);
+}
+
+/* Logo */
+.logo {
+  width: 90px;
+  margin-bottom: 15px;
+  filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.3));
+}
+
+/* Título Portal Recebedoria com efeito de luz animada */
+h2 {
+  margin-bottom: 25px;
+  font-size: 2.2rem;
+  font-weight: 900;
+  color: #c0c0c0; /* prata base */
+  background: linear-gradient(90deg, #c0c0c0, #ffffff, #c0c0c0);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  animation: lightMove 3s linear infinite;
+  text-shadow: 2px 2px 4px #111;
+  background-size: 200% 100%;
+  animation: luzLetra 3s linear infinite;
 }
 
-@keyframes lightMove {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
+@keyframes luzLetra {
+  0% { background-position: 200% 0; }
+  50% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
 }
 
-/* ===== Inputs & Buttons ===== */
-input[type="text"], input[type="password"] {
+/* Inputs */
+input {
   width: 100%;
   padding: 12px;
   margin: 8px 0;
-  border-radius: 8px;
   border: none;
-  font-size: 1rem;
+  border-radius: 8px;
+  background-color: rgba(42, 42, 42, 0.9);
+  color: white;
+  font-size: 15px;
+  box-sizing: border-box;
+  outline: none;
 }
 
+input:focus {
+  box-shadow: 0 0 6px #00ff88;
+}
+
+/* Botões com efeito de brilho */
 button {
   width: 100%;
   padding: 12px;
-  margin-top: 12px;
-  border-radius: 8px;
+  margin-top: 10px;
   border: none;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #00ff88, #00cc66);
+  color: #000;
   font-weight: bold;
-  font-size: 1rem;
+  font-size: 15px;
   cursor: pointer;
+  position: relative;
+  overflow: hidden;
 }
 
-#loginBtn {
-  background: linear-gradient(90deg, #ff5f6d, #ffc371);
-  color: #fff;
-  text-shadow: 0 0 4px rgba(255,255,255,0.6);
-  box-shadow: 0 0 12px rgba(255,255,255,0.4);
-  transition: 0.3s;
+button::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(120deg, rgba(255,255,255,0.6), transparent);
+  animation: brilho 2.2s infinite;
 }
 
-#loginBtn:hover {
-  box-shadow: 0 0 20px rgba(255,255,255,0.8);
+@keyframes brilho {
+  0% { left: -100%; }
+  50% { left: 100%; }
+  100% { left: 100%; }
 }
 
-/* Secondary button */
-button.secondary {
-  background: none;
-  color: #fff;
-  text-decoration: underline;
-  margin-top: 8px;
+button:hover {
+  background: linear-gradient(90deg, #00ff99, #00dd77);
 }
 
-/* ===== Modal ===== */
-.modal {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background: rgba(0,0,0,0.65);
+/* Toggle link */
+.toggle-link {
+  margin-top: 15px;
+  color: #aaa;
+  cursor: pointer;
+  font-size: 14px;
 }
 
-.modal.hidden {
+.toggle-link:hover {
+  color: #00ff88;
+}
+
+/* Rodapé */
+footer {
+  margin-top: 25px;
+  font-size: 13px;
+  color: #777;
+}
+
+/* Forms */
+#registerForm {
   display: none;
-}
-
-.modal-content {
-  background: #111;
-  padding: 30px;
-  border-radius: 12px;
-  width: 320px;
-  text-align: center;
-}
-
-/* ===== Footer ===== */
-.login-footer {
-  margin-top: 20px;
-  font-size: 0.8rem;
-  color: #bbb;
 }
