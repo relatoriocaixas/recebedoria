@@ -11,7 +11,7 @@
   query,
   where,
   orderBy,
-} from "../../firebaseConfig.js";
+} from "../../firebaseConfig_v2.js";
 
 // Paleta de cores por matrícula
 const coresMatricula = {};
