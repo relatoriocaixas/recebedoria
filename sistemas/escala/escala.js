@@ -1,5 +1,4 @@
-﻿// escala.js
-import {
+﻿import {
   auth,
   db,
   onAuthStateChanged,
@@ -14,8 +13,28 @@ import {
   updateDoc
 } from "../../firebaseConfig.js";
 
+// Paleta de cores para matrículas
+const coresMatricula = {};
+const paletaCores = ["#4da6ff", "#ff7f50", "#7fff00", "#ff69b4", "#ffa500", "#00ced1"];
+
 document.addEventListener("DOMContentLoaded", () => {
   console.log("[escala] Iniciando escala.js");
+
+  const selectTipo = document.getElementById("selectTipo");
+  const horarioWrapper = document.getElementById("horarioWrapper");
+  const inputHorario = document.getElementById("inputHorario");
+
+  // Exibe campo horário apenas para Troca de horário
+  if (selectTipo && horarioWrapper) {
+    selectTipo.addEventListener("change", () => {
+      if (selectTipo.value === "troca") {
+        horarioWrapper.style.display = "block";
+      } else {
+        horarioWrapper.style.display = "none";
+        inputHorario.value = "";
+      }
+    });
+  }
 
   onAuthStateChanged(auth, async (user) => {
     if (!user) {
@@ -39,13 +58,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     console.log("[escala] IS_ADMIN:", IS_ADMIN, "MATRICULA:", MATRICULA);
 
-    // Popula seletor de matrículas
     await popularSelectMatriculas(IS_ADMIN, MATRICULA);
-
-    // Inicializa calendário
     inicializarCalendario(IS_ADMIN, MATRICULA);
 
-    // Botão salvar folga
     const btnSalvar = document.getElementById("btnSalvar");
     if (btnSalvar) {
       btnSalvar.addEventListener("click", async () => {
@@ -54,7 +69,6 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
 
-    // Carrega folgas já existentes
     await carregarFolgas(IS_ADMIN, MATRICULA);
   });
 });
@@ -63,8 +77,6 @@ document.addEventListener("DOMContentLoaded", () => {
 // Popula seletor de matrículas
 // ===========================
 async function popularSelectMatriculas(admin, matriculaAtual) {
-  console.log("[escala] Populando seletor de matrículas...");
-
   const selectMatricula = document.getElementById("selectMatricula");
   if (!selectMatricula) return;
 
@@ -84,7 +96,6 @@ async function popularSelectMatriculas(admin, matriculaAtual) {
     matriculas.sort((a, b) => a.matricula.localeCompare(b.matricula, 'pt-BR', { numeric: true }));
 
     selectMatricula.innerHTML = '<option value="">Selecione uma matrícula</option>';
-
     matriculas.forEach(u => {
       const opt = document.createElement("option");
       opt.value = u.matricula;
@@ -98,8 +109,6 @@ async function popularSelectMatriculas(admin, matriculaAtual) {
     } else {
       selectMatricula.disabled = false;
     }
-
-    console.log("[escala] Matrículas carregadas:", matriculas.map(m => m.matricula));
   } catch (err) {
     console.error("[escala] Erro ao carregar matrículas:", err);
     selectMatricula.innerHTML = '<option value="">Erro ao carregar</option>';
@@ -114,13 +123,14 @@ async function salvarFolga(admin) {
   const selectTipo = document.getElementById("selectTipo");
   const selectPeriodo = document.getElementById("selectPeriodo");
   const inputDia = document.getElementById("inputDia");
+  const inputHorario = document.getElementById("inputHorario");
 
   if (!selectMatricula.value || !inputDia.value) {
     alert("Preencha matrícula e dia.");
     return;
   }
 
-  const diaParaSalvar = inputDia.value; // string "YYYY-MM-DD"
+  const diaParaSalvar = inputDia.value; // "YYYY-MM-DD"
 
   try {
     await addDoc(collection(db, "folgas"), {
@@ -128,6 +138,7 @@ async function salvarFolga(admin) {
       tipo: selectTipo.value,
       periodo: selectPeriodo.value,
       dia: diaParaSalvar,
+      horario: selectTipo.value === "troca" ? inputHorario.value : "",
       criadoPor: auth.currentUser.uid
     });
 
@@ -158,13 +169,8 @@ function inicializarCalendario(admin, matricula) {
     const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
     monthLabel.textContent = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}`;
 
-    // Preenche dias vazios
-    for (let i = 0; i < firstDay; i++) {
-      const empty = document.createElement("div");
-      calGrid.appendChild(empty);
-    }
+    for (let i = 0; i < firstDay; i++) calGrid.appendChild(document.createElement("div"));
 
-    // Preenche dias
     for (let d = 1; d <= daysInMonth; d++) {
       const dayDiv = document.createElement("div");
       dayDiv.className = "day";
@@ -198,11 +204,9 @@ function inicializarCalendario(admin, matricula) {
 }
 
 // ===========================
-// Carrega folgas do Firestore e marca no calendário
+// Carrega folgas e adiciona badges
 // ===========================
 async function carregarFolgas(admin, matriculaAtual, monthOverride, yearOverride) {
-  console.log("[escala] Carregando folgas do Firestore...");
-
   const calGrid = document.getElementById("calGrid");
   if (!calGrid) return;
 
@@ -215,27 +219,31 @@ async function carregarFolgas(admin, matriculaAtual, monthOverride, yearOverride
     }
 
     const snapshot = await getDocs(q);
-
-    // Define mês/ano atual do calendário
     const currentMonth = typeof monthOverride === "number" ? monthOverride : new Date().getMonth();
     const currentYear = typeof yearOverride === "number" ? yearOverride : new Date().getFullYear();
 
     snapshot.forEach(docSnap => {
       const f = docSnap.data();
-
-      // Converte string "YYYY-MM-DD" em Date
       const partes = f.dia.split("-");
-      const dia = new Date(parseInt(partes[0], 10), parseInt(partes[1], 10) - 1, parseInt(partes[2], 10));
+      const dia = new Date(parseInt(partes[0],10), parseInt(partes[1],10)-1, parseInt(partes[2],10));
 
       if (dia.getMonth() === currentMonth && dia.getFullYear() === currentYear) {
         const dayElements = Array.from(calGrid.getElementsByClassName("day"));
         dayElements.forEach(el => {
-          const dayNum = parseInt(el.querySelector(".num").textContent, 10);
+          const dayNum = parseInt(el.querySelector(".num").textContent,10);
           if (dia.getDate() === dayNum) {
-            const desc = document.createElement("div");
-            desc.className = "desc";
-            desc.textContent = `${f.matricula} (${f.periodo})`;
-            el.appendChild(desc);
+            if (!coresMatricula[f.matricula]) {
+              coresMatricula[f.matricula] = paletaCores[Object.keys(coresMatricula).length % paletaCores.length];
+            }
+
+            const badge = document.createElement("span");
+            badge.className = "badge";
+            badge.textContent = f.matricula;
+            badge.style.backgroundColor = f.tipo === "troca" ? "#ffb347" : coresMatricula[f.matricula];
+            badge.setAttribute("data-tooltip", f.tipo === "troca" && f.horario ? `${f.matricula} - ${f.horario}` : f.matricula);
+            if(f.tipo === "troca") badge.classList.add("troca");
+
+            el.appendChild(badge);
           }
         });
       }

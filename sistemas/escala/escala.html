@@ -6,15 +6,24 @@
 <title>Escala — Portal Unificado</title>
 <link rel="stylesheet" href="../../style.css">
 <style>
-  .escala-wrap { 
+  /* Container */
+  .escala-wrap {  
     padding:18px; color:var(--text); height:100%; display:flex; flex-direction:column; gap:12px; visibility:hidden; 
   }
+
+  /* Controles superiores */
   .controls { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
-  select,input,button,textarea { 
-    background: rgba(20,20,20,0.6); border:1px solid rgba(255,255,255,0.04); color:var(--text); 
-    padding:8px; border-radius:6px; 
+  select,input,button,textarea {  
+    background: rgba(20,20,20,0.6); border:1px solid rgba(255,255,255,0.04); color:var(--text);  
+    padding:8px; border-radius:6px;  
   }
   button.primary { background:#4da6ff; color:#fff; border:none; cursor:pointer; }
+  button.primary:hover { background:#3399ff; }
+
+  /* Campo horário para troca */
+  #horarioWrapper { display:none; }
+
+  /* Calendário */
   .calendar { background: rgba(10,10,10,0.45); border-radius:8px; padding:12px; flex:1; overflow:auto; margin-top:12px; }
   .grid { display:grid; grid-template-columns:repeat(7,1fr); gap:6px; }
   .grid .day { min-height:90px; background:rgba(255,255,255,0.02); border-radius:6px; padding:6px; position:relative; display:flex; flex-direction:column; gap:2px; cursor:pointer; }
@@ -22,6 +31,39 @@
   .day .desc { font-size:0.75rem; line-height:1; white-space:nowrap; color:#fff; padding:2px 4px; border-radius:4px; overflow:hidden; text-overflow:ellipsis; }
   .weeknames { display:grid; grid-template-columns:repeat(7,1fr); gap:6px; margin-bottom:6px; }
   .weeknames div { text-align:center; color:var(--muted); font-size:0.85rem; }
+
+  /* Badges de folga/troca */
+  .day .badge {
+    display:inline-block;
+    font-size:0.7rem;
+    color:#fff;
+    padding:2px 4px;
+    border-radius:4px;
+    margin-top:16px;
+    margin-right:2px;
+    position:relative;
+    cursor:default;
+  }
+  .day .badge.troca {
+    background-color:#ffb347;
+    color:#000;
+    font-weight:bold;
+    box-shadow:0 0 3px #ff7f50;
+  }
+  .day .badge:hover::after {
+    content: attr(data-tooltip);
+    position:absolute;
+    top:-28px;
+    left:0;
+    white-space:nowrap;
+    background: rgba(0,0,0,0.85);
+    color:#fff;
+    padding:2px 6px;
+    font-size:0.65rem;
+    border-radius:4px;
+    z-index:10;
+  }
+
   @media(max-width:800px){ .grid .day { min-height:72px; } }
 </style>
 </head>
@@ -47,6 +89,11 @@
     <label>Dia:
       <input type="date" id="inputDia"/>
     </label>
+    <div id="horarioWrapper">
+      <label>Horário:
+        <input type="text" id="inputHorario" placeholder="Ex: 14:00-18:00"/>
+      </label>
+    </div>
     <button id="btnSalvar" class="primary">Salvar Folga</button>
 
     <div style="margin-left:auto; display:flex; gap:8px; align-items:center;">
