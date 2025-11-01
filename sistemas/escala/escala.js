@@ -1,19 +1,10 @@
 ﻿// escala.js
 import {
-  auth,
-  db,
-  onAuthStateChanged,
-  collection,
-  getDocs,
-  addDoc,
-  doc,
-  getDoc,
-  updateDoc,
-  query,
-  where,
-  orderBy,
-  Timestamp
+  auth, db, onAuthStateChanged, collection, getDocs,
+  addDoc, doc, getDoc, query, where, orderBy
 } from "../../firebaseConfig.js";
+
+import { Timestamp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
 document.addEventListener("DOMContentLoaded", () => {
   console.log("[escala] Iniciando escala.js");
@@ -23,8 +14,6 @@ document.addEventListener("DOMContentLoaded", () => {
       window.location.href = "/login.html";
       return;
     }
-
-    console.log("[escala] Usuário logado:", user.uid);
 
     const userRef = doc(db, "users", user.uid);
     const userSnap = await getDoc(userRef);
@@ -40,20 +29,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
     console.log("[escala] IS_ADMIN:", IS_ADMIN, "MATRICULA:", MATRICULA);
 
-    // Popula o seletor de matrículas
     await popularSelectMatriculas(IS_ADMIN, MATRICULA);
+    const calendario = inicializarCalendario(IS_ADMIN, MATRICULA);
 
-    // Inicializa calendário
-    inicializarCalendario(IS_ADMIN, MATRICULA);
-
-    // Botão salvar folga
     document.getElementById("btnSalvar").addEventListener("click", async () => {
       await salvarFolga(IS_ADMIN);
-      await carregarFolgas(IS_ADMIN, MATRICULA);
+      await carregarFolgas(IS_ADMIN, MATRICULA, calendario.currentMonth, calendario.currentYear);
     });
 
-    // Carrega folgas já existentes
-    await carregarFolgas(IS_ADMIN, MATRICULA);
+    await carregarFolgas(IS_ADMIN, MATRICULA, calendario.currentMonth, calendario.currentYear);
   });
 });
 
@@ -61,11 +45,8 @@ document.addEventListener("DOMContentLoaded", () => {
 // Popula seletor de matrículas
 // ===========================
 async function popularSelectMatriculas(admin, matriculaAtual) {
-  console.log("[escala] Populando seletor de matrículas...");
-
   const selectMatricula = document.getElementById("selectMatricula");
   if (!selectMatricula) return;
-
   selectMatricula.innerHTML = '<option value="">Carregando...</option>';
 
   try {
@@ -74,15 +55,12 @@ async function popularSelectMatriculas(admin, matriculaAtual) {
 
     snapshot.forEach(docSnap => {
       const data = docSnap.data();
-      if (data.matricula) {
-        matriculas.push({ matricula: data.matricula, nome: data.nome || data.matricula });
-      }
+      if (data.matricula) matriculas.push({ matricula: data.matricula, nome: data.nome || data.matricula });
     });
 
     matriculas.sort((a, b) => a.matricula.localeCompare(b.matricula, 'pt-BR', { numeric: true }));
 
     selectMatricula.innerHTML = '<option value="">Selecione uma matrícula</option>';
-
     matriculas.forEach(u => {
       const opt = document.createElement("option");
       opt.value = u.matricula;
@@ -96,8 +74,6 @@ async function popularSelectMatriculas(admin, matriculaAtual) {
     } else {
       selectMatricula.disabled = false;
     }
-
-    console.log("[escala] Matrículas carregadas:", matriculas.map(m => m.matricula));
   } catch (err) {
     console.error("[escala] Erro ao carregar matrículas:", err);
     selectMatricula.innerHTML = '<option value="">Erro ao carregar</option>';
@@ -118,7 +94,6 @@ async function salvarFolga(admin) {
     return;
   }
 
-  // Corrige fuso horário (define hora fixa às 12:00)
   const partes = inputDia.value.split("-");
   const ano = parseInt(partes[0], 10);
   const mes = parseInt(partes[1], 10) - 1;
@@ -134,7 +109,6 @@ async function salvarFolga(admin) {
       dia: timestamp,
       criadoPor: auth.currentUser.uid
     });
-
     alert("Folga salva com sucesso!");
   } catch (err) {
     console.error("Erro ao salvar folga:", err);
@@ -162,11 +136,7 @@ function inicializarCalendario(admin, matricula) {
     const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
     monthLabel.textContent = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}`;
 
-    // Preenche dias vazios
-    for (let i = 0; i < firstDay; i++) {
-      const empty = document.createElement("div");
-      calGrid.appendChild(empty);
-    }
+    for (let i = 0; i < firstDay; i++) calGrid.appendChild(document.createElement("div"));
 
     for (let d = 1; d <= daysInMonth; d++) {
       const dayDiv = document.createElement("div");
@@ -178,32 +148,28 @@ function inicializarCalendario(admin, matricula) {
 
   prevMonthBtn.addEventListener("click", () => {
     currentMonth--;
-    if (currentMonth < 0) {
-      currentMonth = 11;
-      currentYear--;
-    }
+    if (currentMonth < 0) { currentMonth = 11; currentYear--; }
     renderCalendar();
-    carregarFolgas(admin, matricula);
+    carregarFolgas(admin, matricula, currentMonth, currentYear);
   });
 
   nextMonthBtn.addEventListener("click", () => {
     currentMonth++;
-    if (currentMonth > 11) {
-      currentMonth = 0;
-      currentYear++;
-    }
+    if (currentMonth > 11) { currentMonth = 0; currentYear++; }
     renderCalendar();
-    carregarFolgas(admin, matricula);
+    carregarFolgas(admin, matricula, currentMonth, currentYear);
   });
 
   renderCalendar();
   escalaWrap.style.visibility = "visible";
+
+  return { currentMonth, currentYear };
 }
 
 // ===========================
-// Carrega folgas do Firestore e marca no calendário
+// Carrega folgas e marca no calendário
 // ===========================
-async function carregarFolgas(admin, matriculaAtual) {
+async function carregarFolgas(admin, matriculaAtual, currentMonth, currentYear) {
   console.log("[escala] Carregando folgas do Firestore...");
 
   const calGrid = document.getElementById("calGrid");
@@ -222,16 +188,18 @@ async function carregarFolgas(admin, matriculaAtual) {
     snapshot.forEach(docSnap => {
       const f = docSnap.data();
       const dia = f.dia.toDate();
-      const dayElements = Array.from(calGrid.getElementsByClassName("day"));
-      dayElements.forEach(el => {
-        const dayNum = parseInt(el.querySelector(".num").textContent, 10);
-        if (dia.getDate() === dayNum && dia.getMonth() === currentMonth && dia.getFullYear() === currentYear) {
-          const desc = document.createElement("div");
-          desc.className = "desc";
-          desc.textContent = `${f.matricula} (${f.periodo})`;
-          el.appendChild(desc);
-        }
-      });
+      if (dia.getMonth() === currentMonth && dia.getFullYear() === currentYear) {
+        const dayElements = Array.from(calGrid.getElementsByClassName("day"));
+        dayElements.forEach(el => {
+          const dayNum = parseInt(el.querySelector(".num").textContent, 10);
+          if (dia.getDate() === dayNum) {
+            const desc = document.createElement("div");
+            desc.className = "desc";
+            desc.textContent = `${f.matricula} (${f.periodo})`;
+            el.appendChild(desc);
+          }
+        });
+      }
     });
   } catch (err) {
     console.error("[escala] Erro ao carregar folgas:", err);
