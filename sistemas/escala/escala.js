@@ -5,15 +5,15 @@
   collection,
   getDocs,
   addDoc,
+  deleteDoc,
   doc,
   getDoc,
   query,
   where,
   orderBy,
-  updateDoc
 } from "../../firebaseConfig.js";
 
-// Paleta de cores para matrículas
+// Paleta de cores por matrícula
 const coresMatricula = {};
 const paletaCores = ["#4da6ff", "#ff7f50", "#7fff00", "#ff69b4", "#ffa500", "#00ced1"];
 
@@ -24,7 +24,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const horarioWrapper = document.getElementById("horarioWrapper");
   const inputHorario = document.getElementById("inputHorario");
 
-  // Exibe campo horário apenas para Troca de horário
+  // Exibe campo de horário apenas para "Troca de horário"
   if (selectTipo && horarioWrapper) {
     selectTipo.addEventListener("change", () => {
       if (selectTipo.value === "troca") {
@@ -86,17 +86,19 @@ async function popularSelectMatriculas(admin, matriculaAtual) {
     const snapshot = await getDocs(collection(db, "users"));
     const matriculas = [];
 
-    snapshot.forEach(docSnap => {
+    snapshot.forEach((docSnap) => {
       const data = docSnap.data();
       if (data.matricula) {
         matriculas.push({ matricula: data.matricula, nome: data.nome || data.matricula });
       }
     });
 
-    matriculas.sort((a, b) => a.matricula.localeCompare(b.matricula, 'pt-BR', { numeric: true }));
+    matriculas.sort((a, b) =>
+      a.matricula.localeCompare(b.matricula, "pt-BR", { numeric: true })
+    );
 
     selectMatricula.innerHTML = '<option value="">Selecione uma matrícula</option>';
-    matriculas.forEach(u => {
+    matriculas.forEach((u) => {
       const opt = document.createElement("option");
       opt.value = u.matricula;
       opt.textContent = `${u.matricula} - ${u.nome}`;
@@ -118,7 +120,7 @@ async function popularSelectMatriculas(admin, matriculaAtual) {
 // ===========================
 // Salvar folga
 // ===========================
-async function salvarFolga(admin) {
+async function salvarFolga() {
   const selectMatricula = document.getElementById("selectMatricula");
   const selectTipo = document.getElementById("selectTipo");
   const selectPeriodo = document.getElementById("selectPeriodo");
@@ -130,16 +132,15 @@ async function salvarFolga(admin) {
     return;
   }
 
-  const diaParaSalvar = inputDia.value; // "YYYY-MM-DD"
-
   try {
     await addDoc(collection(db, "folgas"), {
       matricula: selectMatricula.value,
       tipo: selectTipo.value,
       periodo: selectPeriodo.value,
-      dia: diaParaSalvar,
+      dia: inputDia.value,
       horario: selectTipo.value === "troca" ? inputHorario.value : "",
-      criadoPor: auth.currentUser.uid
+      criadoPor: auth.currentUser.uid,
+      criadoEm: new Date().toISOString(),
     });
 
     alert("Folga salva com sucesso!");
@@ -163,7 +164,7 @@ function inicializarCalendario(admin, matricula) {
   let currentMonth = today.getMonth();
   let currentYear = today.getFullYear();
 
-  function renderCalendar() {
+  async function renderCalendar() {
     calGrid.innerHTML = "";
     const firstDay = new Date(currentYear, currentMonth, 1).getDay();
     const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
@@ -174,9 +175,11 @@ function inicializarCalendario(admin, matricula) {
     for (let d = 1; d <= daysInMonth; d++) {
       const dayDiv = document.createElement("div");
       dayDiv.className = "day";
-      dayDiv.innerHTML = `<div class="num">${d}</div>`;
+      dayDiv.innerHTML = `<div class="num">${d}</div><div class="badges"></div>`;
       calGrid.appendChild(dayDiv);
     }
+
+    await carregarFolgas(admin, matricula, currentMonth, currentYear);
   }
 
   prevMonthBtn.addEventListener("click", () => {
@@ -186,7 +189,6 @@ function inicializarCalendario(admin, matricula) {
       currentYear--;
     }
     renderCalendar();
-    carregarFolgas(admin, matricula, currentMonth, currentYear);
   });
 
   nextMonthBtn.addEventListener("click", () => {
@@ -196,7 +198,6 @@ function inicializarCalendario(admin, matricula) {
       currentYear++;
     }
     renderCalendar();
-    carregarFolgas(admin, matricula, currentMonth, currentYear);
   });
 
   renderCalendar();
@@ -204,7 +205,7 @@ function inicializarCalendario(admin, matricula) {
 }
 
 // ===========================
-// Carrega folgas e adiciona badges
+// Carrega folgas e badges
 // ===========================
 async function carregarFolgas(admin, matriculaAtual, monthOverride, yearOverride) {
   const calGrid = document.getElementById("calGrid");
@@ -215,37 +216,65 @@ async function carregarFolgas(admin, matriculaAtual, monthOverride, yearOverride
     if (admin) {
       q = query(collection(db, "folgas"), orderBy("dia", "asc"));
     } else {
-      q = query(collection(db, "folgas"), where("matricula", "==", matriculaAtual), orderBy("dia", "asc"));
+      q = query(
+        collection(db, "folgas"),
+        where("matricula", "==", matriculaAtual),
+        orderBy("dia", "asc")
+      );
     }
 
     const snapshot = await getDocs(q);
-    const currentMonth = typeof monthOverride === "number" ? monthOverride : new Date().getMonth();
-    const currentYear = typeof yearOverride === "number" ? yearOverride : new Date().getFullYear();
+    const currentMonth =
+      typeof monthOverride === "number" ? monthOverride : new Date().getMonth();
+    const currentYear =
+      typeof yearOverride === "number" ? yearOverride : new Date().getFullYear();
 
-    snapshot.forEach(docSnap => {
+    snapshot.forEach((docSnap) => {
       const f = docSnap.data();
-      const partes = f.dia.split("-");
-      const dia = new Date(parseInt(partes[0],10), parseInt(partes[1],10)-1, parseInt(partes[2],10));
+      const id = docSnap.id;
+      const [year, month, day] = f.dia.split("-").map(Number);
 
-      if (dia.getMonth() === currentMonth && dia.getFullYear() === currentYear) {
+      if (month - 1 === currentMonth && year === currentYear) {
         const dayElements = Array.from(calGrid.getElementsByClassName("day"));
-        dayElements.forEach(el => {
-          const dayNum = parseInt(el.querySelector(".num").textContent,10);
-          if (dia.getDate() === dayNum) {
-            if (!coresMatricula[f.matricula]) {
-              coresMatricula[f.matricula] = paletaCores[Object.keys(coresMatricula).length % paletaCores.length];
-            }
+        const dayEl = dayElements.find(
+          (el) => parseInt(el.querySelector(".num").textContent, 10) === day
+        );
 
-            const badge = document.createElement("span");
-            badge.className = "badge";
-            badge.textContent = f.matricula;
-            badge.style.backgroundColor = f.tipo === "troca" ? "#ffb347" : coresMatricula[f.matricula];
-            badge.setAttribute("data-tooltip", f.tipo === "troca" && f.horario ? `${f.matricula} - ${f.horario}` : f.matricula);
-            if(f.tipo === "troca") badge.classList.add("troca");
-
-            el.appendChild(badge);
+        if (dayEl) {
+          const badgeContainer = dayEl.querySelector(".badges");
+          if (!coresMatricula[f.matricula]) {
+            coresMatricula[f.matricula] =
+              paletaCores[Object.keys(coresMatricula).length % paletaCores.length];
           }
-        });
+
+          const badge = document.createElement("span");
+          badge.className = "badge";
+          badge.textContent = f.matricula;
+          badge.style.backgroundColor =
+            f.tipo === "troca" ? "#ffb347" : coresMatricula[f.matricula];
+          badge.title = f.tipo === "troca" && f.horario ? f.horario : "";
+
+          if (f.tipo === "troca") {
+            badge.classList.add("troca");
+            dayEl.classList.add("dia-troca");
+          }
+
+          if (admin) {
+            const delBtn = document.createElement("button");
+            delBtn.textContent = "×";
+            delBtn.className = "del-btn";
+            delBtn.title = "Excluir folga";
+            delBtn.onclick = async () => {
+              if (confirm("Deseja realmente excluir esta folga?")) {
+                await deleteDoc(doc(db, "folgas", id));
+                await carregarFolgas(admin, matriculaAtual, currentMonth, currentYear);
+              }
+            };
+            badge.appendChild(delBtn);
+          }
+
+          badgeContainer.appendChild(badge);
+        }
       }
     });
   } catch (err) {

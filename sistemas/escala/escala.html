@@ -1,116 +1,215 @@
 ﻿<!doctype html>
 <html lang="pt-BR">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Escala — Portal Unificado</title>
-<link rel="stylesheet" href="../../style.css">
-<style>
-  /* Container */
-  .escala-wrap {  
-    padding:18px; color:var(--text); height:100%; display:flex; flex-direction:column; gap:12px; visibility:hidden; 
-  }
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Escala — Portal Unificado</title>
+  <link rel="stylesheet" href="../../style.css">
 
-  /* Controles superiores */
-  .controls { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
-  select,input,button,textarea {  
-    background: rgba(20,20,20,0.6); border:1px solid rgba(255,255,255,0.04); color:var(--text);  
-    padding:8px; border-radius:6px;  
-  }
-  button.primary { background:#4da6ff; color:#fff; border:none; cursor:pointer; }
-  button.primary:hover { background:#3399ff; }
+  <style>
+    /* Container principal */
+    .escala-wrap {  
+      padding:18px;
+      color:var(--text);
+      height:100%;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+      visibility:hidden;
+    }
 
-  /* Campo horário para troca */
-  #horarioWrapper { display:none; }
+    /* Barra de controles */
+    .controls {
+      display:flex;
+      gap:12px;
+      align-items:center;
+      flex-wrap:wrap;
+    }
 
-  /* Calendário */
-  .calendar { background: rgba(10,10,10,0.45); border-radius:8px; padding:12px; flex:1; overflow:auto; margin-top:12px; }
-  .grid { display:grid; grid-template-columns:repeat(7,1fr); gap:6px; }
-  .grid .day { min-height:90px; background:rgba(255,255,255,0.02); border-radius:6px; padding:6px; position:relative; display:flex; flex-direction:column; gap:2px; cursor:pointer; }
-  .grid .day .num { position:absolute; top:6px; right:8px; font-weight:700; color:var(--muted); }
-  .day .desc { font-size:0.75rem; line-height:1; white-space:nowrap; color:#fff; padding:2px 4px; border-radius:4px; overflow:hidden; text-overflow:ellipsis; }
-  .weeknames { display:grid; grid-template-columns:repeat(7,1fr); gap:6px; margin-bottom:6px; }
-  .weeknames div { text-align:center; color:var(--muted); font-size:0.85rem; }
+    select, input, button, textarea {
+      background: rgba(20,20,20,0.6);
+      border:1px solid rgba(255,255,255,0.04);
+      color:var(--text);
+      padding:8px;
+      border-radius:6px;
+      font-size:0.9rem;
+    }
 
-  /* Badges de folga/troca */
-  .day .badge {
-    display:inline-block;
-    font-size:0.7rem;
-    color:#fff;
-    padding:2px 4px;
-    border-radius:4px;
-    margin-top:16px;
-    margin-right:2px;
-    position:relative;
-    cursor:default;
-  }
-  .day .badge.troca {
-    background-color:#ffb347;
-    color:#000;
-    font-weight:bold;
-    box-shadow:0 0 3px #ff7f50;
-  }
-  .day .badge:hover::after {
-    content: attr(data-tooltip);
-    position:absolute;
-    top:-28px;
-    left:0;
-    white-space:nowrap;
-    background: rgba(0,0,0,0.85);
-    color:#fff;
-    padding:2px 6px;
-    font-size:0.65rem;
-    border-radius:4px;
-    z-index:10;
-  }
+    button.primary {
+      background:#4da6ff;
+      color:#fff;
+      border:none;
+      cursor:pointer;
+      transition: background 0.2s ease;
+    }
+    button.primary:hover {
+      background:#3399ff;
+    }
 
-  @media(max-width:800px){ .grid .day { min-height:72px; } }
-</style>
+    /* Campo de horário (aparece apenas em trocas) */
+    #horarioWrapper { display:none; }
+
+    /* Calendário */
+    .calendar {
+      background: rgba(10,10,10,0.45);
+      border-radius:8px;
+      padding:12px;
+      flex:1;
+      overflow:auto;
+      margin-top:12px;
+    }
+
+    .weeknames {
+      display:grid;
+      grid-template-columns:repeat(7,1fr);
+      gap:6px;
+      margin-bottom:6px;
+    }
+
+    .weeknames div {
+      text-align:center;
+      color:var(--muted);
+      font-size:0.85rem;
+      font-weight:500;
+    }
+
+    .grid {
+      display:grid;
+      grid-template-columns:repeat(7,1fr);
+      gap:6px;
+    }
+
+    .day {
+      min-height:90px;
+      background:rgba(255,255,255,0.02);
+      border-radius:6px;
+      padding:4px;
+      position:relative;
+      display:flex;
+      flex-direction:column;
+      align-items:flex-start;
+      justify-content:flex-start;
+      gap:2px;
+      cursor:default;
+      transition:background 0.2s ease;
+    }
+
+    .day:hover {
+      background:rgba(255,255,255,0.05);
+    }
+
+    .day .num {
+      position:absolute;
+      top:5px;
+      right:6px;
+      font-weight:700;
+      font-size:0.85rem;
+      color:var(--muted);
+    }
+
+    /* Badges de folgas/trocas */
+    .day .badges {
+      margin-top:18px;
+      display:flex;
+      flex-wrap:wrap;
+      gap:3px;
+    }
+
+    .badge {
+      font-size:0.7rem;
+      font-weight:500;
+      color:#fff;
+      padding:2px 5px;
+      border-radius:4px;
+      position:relative;
+      cursor:default;
+      user-select:none;
+      white-space:nowrap;
+    }
+
+    .badge.folga {
+      background:#4da6ff;
+    }
+
+    .badge.troca {
+      background:#ffb347;
+      color:#000;
+      font-weight:600;
+      box-shadow:0 0 4px #ff9f40;
+    }
+
+    .badge:hover::after {
+      content: attr(data-tooltip);
+      position:absolute;
+      top:-26px;
+      left:0;
+      background: rgba(0,0,0,0.85);
+      color:#fff;
+      padding:3px 6px;
+      font-size:0.65rem;
+      border-radius:4px;
+      white-space:nowrap;
+      z-index:10;
+    }
+
+    @media(max-width:800px){
+      .grid .day { min-height:72px; }
+      .controls label { flex:1 1 100%; }
+    }
+  </style>
 </head>
+
 <body>
-<div class="escala-wrap">
-  <div class="controls">
-    <label>Matrícula:
-      <select id="selectMatricula"></select>
-    </label>
-    <label>Período:
-      <select id="selectPeriodo">
-        <option value="manha">Manhã</option>
-        <option value="tarde">Tarde</option>
-        <option value="noite">Noite</option>
-      </select>
-    </label>
-    <label>Tipo:
-      <select id="selectTipo">
-        <option value="folga">Folga</option>
-        <option value="troca">Troca de horário</option>
-      </select>
-    </label>
-    <label>Dia:
-      <input type="date" id="inputDia"/>
-    </label>
-    <div id="horarioWrapper">
-      <label>Horário:
-        <input type="text" id="inputHorario" placeholder="Ex: 14:00-18:00"/>
+  <div class="escala-wrap">
+    <!-- Controles Superiores -->
+    <div class="controls">
+      <label>Matrícula:
+        <select id="selectMatricula"></select>
       </label>
-    </div>
-    <button id="btnSalvar" class="primary">Salvar Folga</button>
 
-    <div style="margin-left:auto; display:flex; gap:8px; align-items:center;">
-      <button id="prevMonth">◀</button>
-      <div id="monthLabel" class="small-muted"></div>
-      <button id="nextMonth">▶</button>
+      <label>Período:
+        <select id="selectPeriodo">
+          <option value="manha">Manhã</option>
+          <option value="tarde">Tarde</option>
+          <option value="noite">Noite</option>
+        </select>
+      </label>
+
+      <label>Tipo:
+        <select id="selectTipo">
+          <option value="folga">Folga</option>
+          <option value="troca">Troca de horário</option>
+        </select>
+      </label>
+
+      <label>Dia:
+        <input type="date" id="inputDia" />
+      </label>
+
+      <div id="horarioWrapper">
+        <label>Horário:
+          <input type="text" id="inputHorario" placeholder="Ex: 14:00-18:00" />
+        </label>
+      </div>
+
+      <button id="btnSalvar" class="primary">Salvar</button>
+
+      <div style="margin-left:auto; display:flex; gap:8px; align-items:center;">
+        <button id="prevMonth">◀</button>
+        <div id="monthLabel" class="small-muted"></div>
+        <button id="nextMonth">▶</button>
+      </div>
+    </div>
+
+    <!-- Calendário -->
+    <div class="calendar">
+      <div class="weeknames">
+        <div>Dom</div><div>Seg</div><div>Ter</div><div>Qua</div><div>Qui</div><div>Sex</div><div>Sáb</div>
+      </div>
+      <div id="calGrid" class="grid"></div>
     </div>
   </div>
 
-  <div class="calendar">
-    <div class="weeknames">
-      <div>Dom</div><div>Seg</div><div>Ter</div><div>Qua</div><div>Qui</div><div>Sex</div><div>Sáb</div>
-    </div>
-    <div id="calGrid" class="grid"></div>
-  </div>
-</div>
-
-<script type="module" src="escala.js"></script>
+  <script type="module" src="escala.js"></script>
 </body>
 </html>
