@@ -10,8 +10,14 @@ import {
   getFirestore,
   collection,
   getDocs,
-  doc,
   getDoc,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  doc,
+  query,
+  where,
+  orderBy
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
 export const firebaseConfig = {
@@ -28,13 +34,19 @@ export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 
-// Exporta helpers do Firebase para uso global
+// ✅ Exporta tudo que o escala.js usa
 export {
   onAuthStateChanged,
   collection,
   getDocs,
+  getDoc,
+  addDoc,
+  updateDoc,
+  deleteDoc,
   doc,
-  getDoc
+  query,
+  where,
+  orderBy
 };
 
 // Mantém persistência local
