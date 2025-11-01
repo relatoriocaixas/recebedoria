@@ -1,9 +1,6 @@
 ﻿// escala.js
-import {
 import { auth, db } from "../../firebaseConfig.js";
-import { 
-  onAuthStateChanged 
-} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import { 
   collection, getDocs, doc, getDoc, setDoc, deleteDoc 
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
