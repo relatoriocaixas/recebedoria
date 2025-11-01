@@ -5,12 +5,13 @@
   collection,
   getDocs,
   addDoc,
-  deleteDoc,
   doc,
   getDoc,
   query,
   where,
   orderBy,
+  updateDoc,
+  deleteDoc
 } from "../../firebaseConfig_v2.js";
 
 // Paleta de cores por matrícula
@@ -223,49 +224,69 @@ async function carregarFolgas(admin, matriculaAtual, monthOverride, yearOverride
     const currentMonth = typeof monthOverride === "number" ? monthOverride : new Date().getMonth();
     const currentYear = typeof yearOverride === "number" ? yearOverride : new Date().getFullYear();
 
+    // Limpa os dias antes de redesenhar badges
+    Array.from(calGrid.getElementsByClassName("day")).forEach(el => {
+      const badges = el.querySelectorAll(".badge");
+      badges.forEach(b => b.remove());
+    });
+
     snapshot.forEach(docSnap => {
       const f = docSnap.data();
+      const folgaId = docSnap.id; // precisamos do id para deletar
       const partes = f.dia.split("-");
-      const dia = new Date(parseInt(partes[0],10), parseInt(partes[1],10)-1, parseInt(partes[2],10));
+      const dia = new Date(parseInt(partes[0], 10), parseInt(partes[1], 10) - 1, parseInt(partes[2], 10));
 
       if (dia.getMonth() === currentMonth && dia.getFullYear() === currentYear) {
         const dayElements = Array.from(calGrid.getElementsByClassName("day"));
         dayElements.forEach(el => {
-          const dayNum = parseInt(el.querySelector(".num").textContent,10);
+          const dayNum = parseInt(el.querySelector(".num").textContent, 10);
           if (dia.getDate() === dayNum) {
 
-            // Evita duplicar badge para o mesmo funcionário
-            const jaExiste = Array.from(el.getElementsByClassName("badge"))
-                                   .some(b => b.getAttribute("data-id") === f.matricula);
-            if (jaExiste) return;
-
             if (!coresMatricula[f.matricula]) {
-              coresMatricula[f.matricula] = paletaCores[Object.keys(coresMatricula).length % paletaCores.length];
+              coresMatricula[f.matricula] =
+                paletaCores[Object.keys(coresMatricula).length % paletaCores.length];
             }
 
+            // Cria badge
             const badge = document.createElement("span");
             badge.className = "badge";
+            badge.textContent = admin
+              ? f.matricula
+              : f.tipo === "troca"
+              ? "Troca de horário"
+              : "Folga";
 
-            // Define texto conforme tipo de usuário
-            if (admin) {
-              badge.textContent = f.matricula; // admins veem matrícula
-            } else {
-              badge.textContent = f.tipo === "troca" ? "Troca de horário" : "Folga"; // usuários veem texto
-            }
+            badge.style.backgroundColor =
+              f.tipo === "troca" ? "#ffb347" : (admin ? coresMatricula[f.matricula] : "#4da6ff");
 
-            // Cor da badge
-            badge.style.backgroundColor = f.tipo === "troca" ? "#ffb347" : (admin ? coresMatricula[f.matricula] : "#4da6ff");
-
-            // Tooltip: horário aparece apenas para trocas
-            if(f.tipo === "troca" && f.horario) {
+            // Tooltip
+            if (f.tipo === "troca" && f.horario) {
               badge.setAttribute("data-tooltip", f.horario);
-              badge.classList.add("troca");
             } else {
-              badge.setAttribute("data-tooltip", f.tipo === "troca" ? "Troca de horário" : "Folga");
+              badge.setAttribute(
+                "data-tooltip",
+                f.tipo === "troca" ? "Troca de horário" : "Folga"
+              );
             }
 
-            // Identificador para evitar duplicação
-            badge.setAttribute("data-id", f.matricula);
+            // Se for admin → adicionar botão de exclusão
+            if (admin) {
+              const btnExcluir = document.createElement("button");
+              btnExcluir.textContent = "✕";
+              btnExcluir.className = "btn-excluir";
+              btnExcluir.title = "Excluir folga";
+
+              btnExcluir.addEventListener("click", async (e) => {
+                e.stopPropagation();
+                if (confirm("Deseja realmente excluir esta folga?")) {
+                  await deleteDoc(doc(db, "folgas", folgaId));
+                  alert("Folga excluída com sucesso!");
+                  await carregarFolgas(admin, matriculaAtual, monthOverride, yearOverride);
+                }
+              });
+
+              badge.appendChild(btnExcluir);
+            }
 
             el.appendChild(badge);
           }
