@@ -233,3 +233,33 @@ html,body { height:100%; margin:0; background:var(--bg); color:var(--text); over
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  color: white;
+  margin: 2px;
+  position: relative;
+}
+
+.badge .btn-excluir {
+  background: transparent;
+  border: none;
+  color: white;
+  font-weight: bold;
+  margin-left: 6px;
+  cursor: pointer;
+  font-size: 10px;
+  line-height: 1;
+  opacity: 0.7;
+  transition: 0.2s;
+}
+
+.badge .btn-excluir:hover {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
