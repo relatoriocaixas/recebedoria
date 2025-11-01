@@ -1,10 +1,18 @@
 ﻿// escala.js
 import {
-  auth, db, onAuthStateChanged, collection, getDocs,
-  addDoc, doc, getDoc, query, where, orderBy
+  auth,
+  db,
+  onAuthStateChanged,
+  collection,
+  getDocs,
+  addDoc,
+  doc,
+  getDoc,
+  query,
+  where,
+  orderBy,
+  updateDoc
 } from "../../firebaseConfig.js";
-
-import { Timestamp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
 document.addEventListener("DOMContentLoaded", () => {
   console.log("[escala] Iniciando escala.js");
@@ -14,6 +22,8 @@ document.addEventListener("DOMContentLoaded", () => {
       window.location.href = "/login.html";
       return;
     }
+
+    console.log("[escala] Usuário logado:", user.uid);
 
     const userRef = doc(db, "users", user.uid);
     const userSnap = await getDoc(userRef);
@@ -29,15 +39,23 @@ document.addEventListener("DOMContentLoaded", () => {
 
     console.log("[escala] IS_ADMIN:", IS_ADMIN, "MATRICULA:", MATRICULA);
 
+    // Popula seletor de matrículas
     await popularSelectMatriculas(IS_ADMIN, MATRICULA);
-    const calendario = inicializarCalendario(IS_ADMIN, MATRICULA);
 
-    document.getElementById("btnSalvar").addEventListener("click", async () => {
-      await salvarFolga(IS_ADMIN);
-      await carregarFolgas(IS_ADMIN, MATRICULA, calendario.currentMonth, calendario.currentYear);
-    });
+    // Inicializa calendário
+    inicializarCalendario(IS_ADMIN, MATRICULA);
 
-    await carregarFolgas(IS_ADMIN, MATRICULA, calendario.currentMonth, calendario.currentYear);
+    // Botão salvar folga
+    const btnSalvar = document.getElementById("btnSalvar");
+    if (btnSalvar) {
+      btnSalvar.addEventListener("click", async () => {
+        await salvarFolga(IS_ADMIN);
+        await carregarFolgas(IS_ADMIN, MATRICULA);
+      });
+    }
+
+    // Carrega folgas já existentes
+    await carregarFolgas(IS_ADMIN, MATRICULA);
   });
 });
 
@@ -45,8 +63,11 @@ document.addEventListener("DOMContentLoaded", () => {
 // Popula seletor de matrículas
 // ===========================
 async function popularSelectMatriculas(admin, matriculaAtual) {
+  console.log("[escala] Populando seletor de matrículas...");
+
   const selectMatricula = document.getElementById("selectMatricula");
   if (!selectMatricula) return;
+
   selectMatricula.innerHTML = '<option value="">Carregando...</option>';
 
   try {
@@ -55,12 +76,15 @@ async function popularSelectMatriculas(admin, matriculaAtual) {
 
     snapshot.forEach(docSnap => {
       const data = docSnap.data();
-      if (data.matricula) matriculas.push({ matricula: data.matricula, nome: data.nome || data.matricula });
+      if (data.matricula) {
+        matriculas.push({ matricula: data.matricula, nome: data.nome || data.matricula });
+      }
     });
 
     matriculas.sort((a, b) => a.matricula.localeCompare(b.matricula, 'pt-BR', { numeric: true }));
 
     selectMatricula.innerHTML = '<option value="">Selecione uma matrícula</option>';
+
     matriculas.forEach(u => {
       const opt = document.createElement("option");
       opt.value = u.matricula;
@@ -74,6 +98,8 @@ async function popularSelectMatriculas(admin, matriculaAtual) {
     } else {
       selectMatricula.disabled = false;
     }
+
+    console.log("[escala] Matrículas carregadas:", matriculas.map(m => m.matricula));
   } catch (err) {
     console.error("[escala] Erro ao carregar matrículas:", err);
     selectMatricula.innerHTML = '<option value="">Erro ao carregar</option>';
@@ -94,21 +120,17 @@ async function salvarFolga(admin) {
     return;
   }
 
-  const partes = inputDia.value.split("-");
-  const ano = parseInt(partes[0], 10);
-  const mes = parseInt(partes[1], 10) - 1;
-  const dia = parseInt(partes[2], 10);
-  const dataParaSalvar = new Date(ano, mes, dia, 12, 0, 0);
-  const timestamp = Timestamp.fromDate(dataParaSalvar);
+  const diaParaSalvar = inputDia.value; // string "YYYY-MM-DD"
 
   try {
     await addDoc(collection(db, "folgas"), {
       matricula: selectMatricula.value,
       tipo: selectTipo.value,
       periodo: selectPeriodo.value,
-      dia: timestamp,
+      dia: diaParaSalvar,
       criadoPor: auth.currentUser.uid
     });
+
     alert("Folga salva com sucesso!");
   } catch (err) {
     console.error("Erro ao salvar folga:", err);
@@ -136,8 +158,13 @@ function inicializarCalendario(admin, matricula) {
     const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
     monthLabel.textContent = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}`;
 
-    for (let i = 0; i < firstDay; i++) calGrid.appendChild(document.createElement("div"));
+    // Preenche dias vazios
+    for (let i = 0; i < firstDay; i++) {
+      const empty = document.createElement("div");
+      calGrid.appendChild(empty);
+    }
 
+    // Preenche dias
     for (let d = 1; d <= daysInMonth; d++) {
       const dayDiv = document.createElement("div");
       dayDiv.className = "day";
@@ -148,28 +175,32 @@ function inicializarCalendario(admin, matricula) {
 
   prevMonthBtn.addEventListener("click", () => {
     currentMonth--;
-    if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+    if (currentMonth < 0) {
+      currentMonth = 11;
+      currentYear--;
+    }
     renderCalendar();
     carregarFolgas(admin, matricula, currentMonth, currentYear);
   });
 
   nextMonthBtn.addEventListener("click", () => {
     currentMonth++;
-    if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+    if (currentMonth > 11) {
+      currentMonth = 0;
+      currentYear++;
+    }
     renderCalendar();
     carregarFolgas(admin, matricula, currentMonth, currentYear);
   });
 
   renderCalendar();
   escalaWrap.style.visibility = "visible";
-
-  return { currentMonth, currentYear };
 }
 
 // ===========================
-// Carrega folgas e marca no calendário
+// Carrega folgas do Firestore e marca no calendário
 // ===========================
-async function carregarFolgas(admin, matriculaAtual, currentMonth, currentYear) {
+async function carregarFolgas(admin, matriculaAtual, monthOverride, yearOverride) {
   console.log("[escala] Carregando folgas do Firestore...");
 
   const calGrid = document.getElementById("calGrid");
@@ -185,9 +216,17 @@ async function carregarFolgas(admin, matriculaAtual, currentMonth, currentYear) 
 
     const snapshot = await getDocs(q);
 
+    // Define mês/ano atual do calendário
+    const currentMonth = typeof monthOverride === "number" ? monthOverride : new Date().getMonth();
+    const currentYear = typeof yearOverride === "number" ? yearOverride : new Date().getFullYear();
+
     snapshot.forEach(docSnap => {
       const f = docSnap.data();
-      const dia = f.dia.toDate();
+
+      // Converte string "YYYY-MM-DD" em Date
+      const partes = f.dia.split("-");
+      const dia = new Date(parseInt(partes[0], 10), parseInt(partes[1], 10) - 1, parseInt(partes[2], 10));
+
       if (dia.getMonth() === currentMonth && dia.getFullYear() === currentYear) {
         const dayElements = Array.from(calGrid.getElementsByClassName("day"));
         dayElements.forEach(el => {
