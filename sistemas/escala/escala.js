@@ -14,10 +14,51 @@
   deleteDoc
 } from "../../firebaseConfig_v2.js";
 
-// Paleta de cores por matrícula
-const coresMatricula = {};
-const paletaCores = ["#4da6ff", "#ff7f50", "#7fff00", "#ff69b4", "#ffa500", "#00ced1"];
+// ==========================
+// Cores fixas por matrícula
+// ==========================
+const coresMatriculaFixas = {
+  "4144": "#4da6ff",    // azul claro
+  "5831": "#ffeb3b",    // amarelo
+  "6994": "#b0b0b0",    // cinza
+  "7794": "#ff9800",    // laranja
+  "5354": "#90ee90",    // verde claro
+  "6266": "#00bfff",    // azul celeste
+  "6414": "#8b4513",    // marrom
+  "5271": "#ff69b4",    // rosa
+  "9003": "#800080",    // roxo
+  "8789": "#c8a2c8",    // lilás
+  "1858": "#556b2f"     // verde musgo
+};
 
+// Estilo animado para trocas
+const style = document.createElement("style");
+style.textContent = `
+@keyframes brilhoPulse {
+  0% { box-shadow: 0 0 4px 2px rgba(255,0,0,0.3); }
+  50% { box-shadow: 0 0 10px 4px rgba(255,0,0,0.8); }
+  100% { box-shadow: 0 0 4px 2px rgba(255,0,0,0.3); }
+}
+.badge.troca {
+  background-color: red !important;
+  color: #fff;
+  animation: brilhoPulse 1.5s infinite;
+}
+.btn-excluir {
+  margin-left: 6px;
+  background: transparent;
+  border: none;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+}
+.btn-excluir:hover {
+  color: #ff5555;
+}
+`;
+document.head.appendChild(style);
+
+// ==========================
 document.addEventListener("DOMContentLoaded", () => {
   console.log("[escala] Iniciando escala.js");
 
@@ -65,7 +106,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const btnSalvar = document.getElementById("btnSalvar");
     if (btnSalvar) {
       btnSalvar.addEventListener("click", async () => {
-        await salvarFolga(IS_ADMIN);
+        await salvarFolga();
         await carregarFolgas(IS_ADMIN, MATRICULA);
       });
     }
@@ -232,44 +273,35 @@ async function carregarFolgas(admin, matriculaAtual, monthOverride, yearOverride
 
     snapshot.forEach(docSnap => {
       const f = docSnap.data();
-      const folgaId = docSnap.id; // precisamos do id para deletar
+      const folgaId = docSnap.id;
       const partes = f.dia.split("-");
-      const dia = new Date(parseInt(partes[0], 10), parseInt(partes[1], 10) - 1, parseInt(partes[2], 10));
+      const dia = new Date(parseInt(partes[0]), parseInt(partes[1]) - 1, parseInt(partes[2]));
 
       if (dia.getMonth() === currentMonth && dia.getFullYear() === currentYear) {
         const dayElements = Array.from(calGrid.getElementsByClassName("day"));
         dayElements.forEach(el => {
           const dayNum = parseInt(el.querySelector(".num").textContent, 10);
           if (dia.getDate() === dayNum) {
+            const badge = document.createElement("span");
+            badge.className = f.tipo === "troca" ? "badge troca" : "badge";
 
-            if (!coresMatricula[f.matricula]) {
-              coresMatricula[f.matricula] =
-                paletaCores[Object.keys(coresMatricula).length % paletaCores.length];
+            if (admin) {
+              badge.textContent = f.matricula;
+            } else {
+              badge.textContent = f.tipo === "troca" ? "Troca de horário" : "Folga";
             }
 
-            // Cria badge
-            const badge = document.createElement("span");
-            badge.className = "badge";
-            badge.textContent = admin
-              ? f.matricula
-              : f.tipo === "troca"
-              ? "Troca de horário"
-              : "Folga";
+            // Define cor conforme matrícula
+            const cor = coresMatriculaFixas[f.matricula] || "#4da6ff";
+            if (f.tipo !== "troca") {
+              badge.style.backgroundColor = cor;
+            }
 
-            badge.style.backgroundColor =
-              f.tipo === "troca" ? "#ffb347" : (admin ? coresMatricula[f.matricula] : "#4da6ff");
-
-            // Tooltip
             if (f.tipo === "troca" && f.horario) {
               badge.setAttribute("data-tooltip", f.horario);
-            } else {
-              badge.setAttribute(
-                "data-tooltip",
-                f.tipo === "troca" ? "Troca de horário" : "Folga"
-              );
             }
 
-            // Se for admin → adicionar botão de exclusão
+            // Botão de exclusão (apenas admin)
             if (admin) {
               const btnExcluir = document.createElement("button");
               btnExcluir.textContent = "✕";
@@ -284,7 +316,6 @@ async function carregarFolgas(admin, matriculaAtual, monthOverride, yearOverride
                   await carregarFolgas(admin, matriculaAtual, monthOverride, yearOverride);
                 }
               });
-
               badge.appendChild(btnExcluir);
             }
 
