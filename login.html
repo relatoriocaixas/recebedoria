@@ -1,31 +1,46 @@
 
 <!DOCTYPE html>
 <html lang="pt-BR">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Portal Unificado - Login</title>
-  <link rel="stylesheet" href="login.css" />
-</head>
-<body>
-  <div class="login-container">
-    <h2>Portal Unificado</h2>
-    <input type="email" id="email" placeholder="Email" required />
-    <input type="password" id="password" placeholder="Senha" required />
-    <button id="loginBtn">Entrar</button>
-    <button id="showCreateAccountBtn" class="secondary">Criar Conta</button>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Portal Unificado - Login</title>
+    <link rel="icon" type="image/x-icon" href="assets/icon-32.ico" />
+    <link rel="stylesheet" href="login.css" />
+  </head>
+  <body>
+    <div class="login-container">
+      <div class="login-box">
+        <img src="assets/logo.png" alt="Logo" class="login-logo" />
+        <h2>Portal Unificado</h2>
 
-    <div id="createAccountModal" class="modal hidden">
-      <div class="modal-content">
-        <h3>Criar Nova Conta</h3>
-        <input type="email" id="newEmail" placeholder="Novo Email" required />
-        <input type="password" id="newPassword" placeholder="Nova Senha" required />
-        <button id="createAccountBtn">Criar</button>
-        <button id="closeModalBtn" class="secondary">Cancelar</button>
+        <input type="text" id="email" placeholder="Matrícula" required />
+        <input type="password" id="password" placeholder="Senha" required />
+
+        <button id="loginBtn" class="btn-primary">Entrar</button>
+        <button id="showCreateAccountBtn" class="btn-secondary">
+          Criar Conta
+        </button>
+      </div>
+
+      <div id="createAccountModal" class="modal hidden">
+        <div class="modal-content">
+          <h3>Criar Nova Conta</h3>
+          <input type="text" id="newName" placeholder="Nome completo" required />
+          <input type="text" id="newEmail" placeholder="Matrícula" required />
+          <input type="password" id="newPassword" placeholder="Senha" required />
+          <input
+            type="password"
+            id="confirmPassword"
+            placeholder="Confirmar senha"
+            required
+          />
+          <button id="createAccountBtn" class="btn-primary">Salvar</button>
+          <button id="closeModalBtn" class="btn-secondary">Cancelar</button>
+        </div>
       </div>
     </div>
-  </div>
 
-  <script type="module" src="login.js"></script>
-</body>
+    <script type="module" src="login.js"></script>
+  </body>
 </html>
