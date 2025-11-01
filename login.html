@@ -1,107 +1,42 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Portal Recebedoria</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portal Recebedoria - Login</title>
+  <link rel="stylesheet" href="login.css">
   <link rel="icon" type="image/x-icon" href="assets/icon-32.ico">
-  <link rel="stylesheet" href="login.css" />
 </head>
 <body>
   <div class="login-container">
-    <img src="assets/logo.png" alt="Logo" class="logo">
-    <h2 id="formTitle">Bem-vindo ao Portal Recebedoria...</h2>
+    <img src="assets/logo.png" alt="Logo" class="login-logo">
 
-    <!-- Login -->
-    <div id="loginForm">
-      <input type="text" id="loginMatricula" placeholder="Matricula" required />
-      <input type="password" id="loginSenha" placeholder="Senha" required />
-      <button id="btnLogin">Entrar</button>
-      <div class="toggle-link" id="showRegister">Criar uma conta</div>
+    <h2 class="form-title">Portal Recebedoria</h2>
+
+    <form id="loginForm">
+      <input type="text" id="email" placeholder="Matrícula" required>
+      <input type="password" id="password" placeholder="Senha" required>
+      <button type="submit" id="loginBtn">Entrar</button>
+      <button type="button" id="showCreateAccountBtn" class="secondary">Criar Conta</button>
+    </form>
+
+    <div id="createAccountModal" class="modal hidden">
+      <div class="modal-content">
+        <h3>Criar Nova Conta</h3>
+        <input type="text" id="newName" placeholder="Nome" required>
+        <input type="text" id="newEmail" placeholder="Matrícula" required>
+        <input type="password" id="newPassword" placeholder="Senha" required>
+        <input type="password" id="confirmPassword" placeholder="Confirmar Senha" required>
+        <button id="createAccountBtn">Criar</button>
+        <button id="closeModalBtn" class="secondary">Cancelar</button>
+      </div>
     </div>
 
-    <!-- Registro -->
-    <div id="registerForm">
-      <input type="text" id="regNome" placeholder="Nome completo" required />
-      <input type="text" id="regMatricula" placeholder="Matricula" required />
-      <input type="password" id="regSenha" placeholder="Senha" required />
-      <input type="password" id="regConfirmaSenha" placeholder="Confirmar senha" required />
-      <button id="btnRegistrar">Registrar</button>
-      <div class="toggle-link" id="showLogin">Ja tenho conta</div>
-    </div>
+    <footer class="login-footer">
+      Developed by Lucas L Custodio - Portal Recebedoria v1
+    </footer>
   </div>
 
-  <footer>
-    Developed by Lucas L Custodio - Portal Recebedoria v1
-  </footer>
-
-  <script type="module">
-    import { app, auth, db } from "./firebaseConfig_v2.js";
-    import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
-    import { collection, addDoc } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
-
-    const loginForm = document.getElementById("loginForm");
-    const registerForm = document.getElementById("registerForm");
-    const showRegister = document.getElementById("showRegister");
-    const showLogin = document.getElementById("showLogin");
-    const formTitle = document.getElementById("formTitle");
-
-    // Inicializa visibilidade
-    registerForm.style.display = "none";
-
-    showRegister.addEventListener("click", () => {
-      loginForm.style.display = "none";
-      registerForm.style.display = "block";
-      formTitle.textContent = "Registrar";
-    });
-
-    showLogin.addEventListener("click", () => {
-      registerForm.style.display = "none";
-      loginForm.style.display = "block";
-      formTitle.textContent = "Login";
-    });
-
-    // Login
-    document.getElementById("btnLogin").addEventListener("click", async () => {
-      const matricula = document.getElementById("loginMatricula").value;
-      const senha = document.getElementById("loginSenha").value;
-
-      try {
-        await signInWithEmailAndPassword(auth, `${matricula}@movebuss.local`, senha);
-        window.location.href = "index.html";
-      } catch (e) {
-        alert("Erro ao fazer login: " + e.message);
-      }
-    });
-
-    // Registro
-    document.getElementById("btnRegistrar").addEventListener("click", async () => {
-      const nome = document.getElementById("regNome").value;
-      const matricula = document.getElementById("regMatricula").value;
-      const senha = document.getElementById("regSenha").value;
-      const confirmaSenha = document.getElementById("regConfirmaSenha").value;
-
-      if (senha !== confirmaSenha) {
-        alert("As senhas não coincidem!");
-        return;
-      }
-
-      try {
-        const cred = await createUserWithEmailAndPassword(auth, `${matricula}@movebuss.local`, senha);
-        await addDoc(collection(db, "usuarios"), {
-          uid: cred.user.uid,
-          nome,
-          matricula,
-          criadoEm: new Date().toISOString(),
-        });
-        alert("Usuário registrado com sucesso!");
-        registerForm.style.display = "none";
-        loginForm.style.display = "block";
-        formTitle.textContent = "Login";
-      } catch (e) {
-        alert("Erro ao registrar: " + e.message);
-      }
-    });
-  </script>
+  <script type="module" src="login.js"></script>
 </body>
 </html>
