@@ -234,9 +234,9 @@ async function carregarFolgas(admin, matriculaAtual, monthOverride, yearOverride
           const dayNum = parseInt(el.querySelector(".num").textContent,10);
           if (dia.getDate() === dayNum) {
 
-            // Evita duplicar a matrícula
+            // Evita duplicar badge para o mesmo funcionário
             const jaExiste = Array.from(el.getElementsByClassName("badge"))
-                                   .some(b => b.textContent === f.matricula);
+                                   .some(b => b.getAttribute("data-id") === f.matricula);
             if (jaExiste) return;
 
             if (!coresMatricula[f.matricula]) {
@@ -245,16 +245,27 @@ async function carregarFolgas(admin, matriculaAtual, monthOverride, yearOverride
 
             const badge = document.createElement("span");
             badge.className = "badge";
-            badge.textContent = f.matricula;
-            badge.style.backgroundColor = f.tipo === "troca" ? "#ffb347" : coresMatricula[f.matricula];
 
-            // Tooltip com horário apenas para trocas
+            // Define texto conforme tipo de usuário
+            if (admin) {
+              badge.textContent = f.matricula; // admins veem matrícula
+            } else {
+              badge.textContent = f.tipo === "troca" ? "Troca de horário" : "Folga"; // usuários veem texto
+            }
+
+            // Cor da badge
+            badge.style.backgroundColor = f.tipo === "troca" ? "#ffb347" : (admin ? coresMatricula[f.matricula] : "#4da6ff");
+
+            // Tooltip: horário aparece apenas para trocas
             if(f.tipo === "troca" && f.horario) {
-              badge.setAttribute("data-tooltip", `${f.matricula} - ${f.horario}`);
+              badge.setAttribute("data-tooltip", f.horario);
               badge.classList.add("troca");
             } else {
-              badge.setAttribute("data-tooltip", f.matricula);
+              badge.setAttribute("data-tooltip", f.tipo === "troca" ? "Troca de horário" : "Folga");
             }
+
+            // Identificador para evitar duplicação
+            badge.setAttribute("data-id", f.matricula);
 
             el.appendChild(badge);
           }
