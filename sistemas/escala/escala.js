@@ -216,65 +216,49 @@ async function carregarFolgas(admin, matriculaAtual, monthOverride, yearOverride
     if (admin) {
       q = query(collection(db, "folgas"), orderBy("dia", "asc"));
     } else {
-      q = query(
-        collection(db, "folgas"),
-        where("matricula", "==", matriculaAtual),
-        orderBy("dia", "asc")
-      );
+      q = query(collection(db, "folgas"), where("matricula", "==", matriculaAtual), orderBy("dia", "asc"));
     }
 
     const snapshot = await getDocs(q);
-    const currentMonth =
-      typeof monthOverride === "number" ? monthOverride : new Date().getMonth();
-    const currentYear =
-      typeof yearOverride === "number" ? yearOverride : new Date().getFullYear();
+    const currentMonth = typeof monthOverride === "number" ? monthOverride : new Date().getMonth();
+    const currentYear = typeof yearOverride === "number" ? yearOverride : new Date().getFullYear();
 
-    snapshot.forEach((docSnap) => {
+    snapshot.forEach(docSnap => {
       const f = docSnap.data();
-      const id = docSnap.id;
-      const [year, month, day] = f.dia.split("-").map(Number);
+      const partes = f.dia.split("-");
+      const dia = new Date(parseInt(partes[0],10), parseInt(partes[1],10)-1, parseInt(partes[2],10));
 
-      if (month - 1 === currentMonth && year === currentYear) {
+      if (dia.getMonth() === currentMonth && dia.getFullYear() === currentYear) {
         const dayElements = Array.from(calGrid.getElementsByClassName("day"));
-        const dayEl = dayElements.find(
-          (el) => parseInt(el.querySelector(".num").textContent, 10) === day
-        );
+        dayElements.forEach(el => {
+          const dayNum = parseInt(el.querySelector(".num").textContent,10);
+          if (dia.getDate() === dayNum) {
 
-        if (dayEl) {
-          const badgeContainer = dayEl.querySelector(".badges");
-          if (!coresMatricula[f.matricula]) {
-            coresMatricula[f.matricula] =
-              paletaCores[Object.keys(coresMatricula).length % paletaCores.length];
+            // Evita duplicar a matrícula
+            const jaExiste = Array.from(el.getElementsByClassName("badge"))
+                                   .some(b => b.textContent === f.matricula);
+            if (jaExiste) return;
+
+            if (!coresMatricula[f.matricula]) {
+              coresMatricula[f.matricula] = paletaCores[Object.keys(coresMatricula).length % paletaCores.length];
+            }
+
+            const badge = document.createElement("span");
+            badge.className = "badge";
+            badge.textContent = f.matricula;
+            badge.style.backgroundColor = f.tipo === "troca" ? "#ffb347" : coresMatricula[f.matricula];
+
+            // Tooltip com horário apenas para trocas
+            if(f.tipo === "troca" && f.horario) {
+              badge.setAttribute("data-tooltip", `${f.matricula} - ${f.horario}`);
+              badge.classList.add("troca");
+            } else {
+              badge.setAttribute("data-tooltip", f.matricula);
+            }
+
+            el.appendChild(badge);
           }
-
-          const badge = document.createElement("span");
-          badge.className = "badge";
-          badge.textContent = f.matricula;
-          badge.style.backgroundColor =
-            f.tipo === "troca" ? "#ffb347" : coresMatricula[f.matricula];
-          badge.title = f.tipo === "troca" && f.horario ? f.horario : "";
-
-          if (f.tipo === "troca") {
-            badge.classList.add("troca");
-            dayEl.classList.add("dia-troca");
-          }
-
-          if (admin) {
-            const delBtn = document.createElement("button");
-            delBtn.textContent = "×";
-            delBtn.className = "del-btn";
-            delBtn.title = "Excluir folga";
-            delBtn.onclick = async () => {
-              if (confirm("Deseja realmente excluir esta folga?")) {
-                await deleteDoc(doc(db, "folgas", id));
-                await carregarFolgas(admin, matriculaAtual, currentMonth, currentYear);
-              }
-            };
-            badge.appendChild(delBtn);
-          }
-
-          badgeContainer.appendChild(badge);
-        }
+        });
       }
     });
   } catch (err) {
